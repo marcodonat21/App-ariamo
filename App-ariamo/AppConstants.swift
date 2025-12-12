@@ -13,7 +13,8 @@ extension Color {
 struct Activity: Identifiable {
     let id = UUID()
     let title: String
-    let imageName: String // Nomi di sistema SF Symbols
+    let imageName: String
+    let color: Color
 }
 
 // Modello dati temporaneo per l'evento in creazione (usato in CreationWizard)

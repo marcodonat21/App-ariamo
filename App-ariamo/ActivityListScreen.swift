@@ -3,10 +3,10 @@ import SwiftUI
 struct ActivityListScreen: View {
     // Dati fittizi (Activity è definito in AppConstants)
     let activities = [
-        Activity(title: "Sport", imageName: "figure.run"),
-        Activity(title: "Travel & Adventure", imageName: "airplane"),
-        Activity(title: "Party", imageName: "music.note"),
-        Activity(title: "Holiday", imageName: "sun.max.fill")
+        Activity(title: "Sport", imageName: "sport", color: .red),
+        Activity(title: "Travel & Adventure", imageName: "airplane", color: .orange),
+        Activity(title: "Party", imageName: "party", color: .yellow),
+        Activity(title: "Studying", imageName: "sun.max.fill", color: .VERDE)
     ]
 
     var body: some View {
@@ -29,32 +29,30 @@ struct ActivityCard: View {
     let activity: Activity
     
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Immagine di sfondo (simulata)
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(height: 150)
-                .cornerRadius(15)
-                .overlay(
-                    Image(systemName: activity.imageName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 50)
-                        .foregroundColor(.white.opacity(0.5))
-                )
-            
-            // Testo sopra l'immagine
-            VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
                 Text(activity.title)
-                    .font(.title3)
-                    .bold()
-                    .foregroundColor(.white)
-                    .shadow(radius: 2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .font(.title)
+                
+                Spacer()
+
+                Image(activity.imageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 100, height: 100)
+                    .foregroundStyle(.white.opacity(0.8))
             }
-            .padding()
+            .padding(.top)
         }
+        .padding()
+        .frame(width: 380, height: 180, alignment: .leading)
+        .background(activity.color)
+        .clipShape(RoundedRectangle(cornerRadius: 25))
     }
 }
+
 
 struct ActivityListScreen_Previews: PreviewProvider {
     static var previews: some View {
