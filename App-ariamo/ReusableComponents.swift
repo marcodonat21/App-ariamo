@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // --- COMPONENTI UI RIUTILIZZABILI ---
 
@@ -15,9 +16,11 @@ struct CustomTextField: View {
                 TextField(placeholder, text: $text)
             }
         }
+        .font(.system(.body, design: .rounded)) // FONT ARROTONDATO
         .padding()
-        .background(Color.inputGray) // Usa inputGray da AppConstants
+        .background(Color.white) // SFONDO BIANCO
         .cornerRadius(30)
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2) // Ombra leggera per stacco
         .padding(.horizontal, 40)
     }
 }
@@ -102,5 +105,44 @@ struct ReusableComponents_Previews: PreviewProvider {
         }
         .padding(.top, 50)
         .background(Color.white)
+    }
+}
+
+// --- COMPONENTE FOTOCAMERA ---
+struct CameraPicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.presentationMode) var presentationMode
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .camera // Apre la fotocamera
+        picker.allowsEditing = true // Permette di ritagliare (quadrato)
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: CameraPicker
+        
+        init(_ parent: CameraPicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
+                parent.selectedImage = image
+            }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
+        }
     }
 }
