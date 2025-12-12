@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@main
 struct App_ariamoApp: App {
     var body: some Scene {
         WindowGroup {
