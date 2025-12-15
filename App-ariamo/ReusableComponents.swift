@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// --- COMPONENTI UI RIUTILIZZABILI ---
+// --- REUSABLE UI COMPONENTS --- // Translated Comment
 
 struct CustomTextField: View {
     var placeholder: String
@@ -16,16 +16,16 @@ struct CustomTextField: View {
                 TextField(placeholder, text: $text)
             }
         }
-        .font(.system(.body, design: .rounded)) // FONT ARROTONDATO
+        .font(.system(.body, design: .rounded)) // ROUNDED FONT // Translated Comment
         .padding()
-        .background(Color.white) // SFONDO BIANCO
+        .background(Color.white) // WHITE BACKGROUND // Translated Comment
         .cornerRadius(30)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2) // Ombra leggera per stacco
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2) // Light shadow for separation // Translated Comment
         .padding(.horizontal, 40)
     }
 }
 
-// Bottone Sociale Grande (Usato in AuthLandingScreen per Login/Sign up con terze parti)
+// Large Social Button (Used in AuthLandingScreen for Login/Sign up with third parties) // Translated Comment
 struct SocialButton: View {
     var text: String
     var icon: String
@@ -48,7 +48,7 @@ struct SocialButton: View {
     }
 }
 
-// NUOVO: Bottone Sociale Piccolo (Usato in AuthLandingScreen per l'HStack dei social)
+// NEW: Small Social Button (Used in AuthLandingScreen for social HStack) // Translated Comment
 struct SocialButtonSmall: View {
     let icon: String
     var body: some View {
@@ -61,7 +61,7 @@ struct SocialButtonSmall: View {
     }
 }
 
-// Bottone per la selezione del Genere
+// Button for Gender selection // Translated Comment
 struct GenderButton: View {
     var title: String
     var isSelected: Bool
@@ -73,7 +73,7 @@ struct GenderButton: View {
                 .foregroundColor(isSelected ? .white : .gray)
                 .padding()
                 .frame(width: 100)
-                .background(isSelected ? Color.appMint : Color.inputGray) // appMint da AppConstants
+                .background(isSelected ? Color.appMint : Color.inputGray) // appMint from AppConstants
                 .cornerRadius(20)
         }
     }
@@ -82,7 +82,7 @@ struct GenderButton: View {
 // --- PREVIEWS ---
 
 struct ReusableComponents_Previews: PreviewProvider {
-    @State static var testText = "Esempio"
+    @State static var testText = "Example" // Translated
     
     static var previews: some View {
         VStack(spacing: 20) {
@@ -108,7 +108,7 @@ struct ReusableComponents_Previews: PreviewProvider {
     }
 }
 
-// --- COMPONENTE FOTOCAMERA ---
+// --- CAMERA COMPONENT --- // Translated Comment
 struct CameraPicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
     @Environment(\.presentationMode) var presentationMode
@@ -116,8 +116,8 @@ struct CameraPicker: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
-        picker.sourceType = .camera // Apre la fotocamera
-        picker.allowsEditing = true // Permette di ritagliare (quadrato)
+        picker.sourceType = .camera // Opens the camera // Translated Comment
+        picker.allowsEditing = true // Allows cropping (square) // Translated Comment
         return picker
     }
     

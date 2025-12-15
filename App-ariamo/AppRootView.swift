@@ -1,20 +1,20 @@
 import SwiftUI
 
-// AppRootView è il punto d'ingresso che decide se mostrare la Home o l'Autenticazione.
+// AppRootView is the entry point that decides whether to show the Home or Authentication.
 struct AppRootView: View {
     
-    // Lo stato che traccia l'autenticazione dell'utente.
-    // In un'app reale, questo verrebbe letto da un servizio di autenticazione.
+    // The state that tracks user authentication.
+    // In a real app, this would be read from an authentication service.
     @State private var isUserLoggedIn: Bool = false
     
     var body: some View {
         Group {
             if isUserLoggedIn {
-                // UTENTE LOGGATO: Mostra la Home (ContentView)
+                // USER LOGGED IN: Show Home (ContentView)
                 ContentView()
-                    .transition(.move(edge: .trailing)) // Aggiunge una transizione visiva
+                    .transition(.move(edge: .trailing)) // Adds a visual transition
             } else {
-                // UTENTE NON LOGGATO: Mostra la schermata di scelta (Login o Registrazione)
+                // USER NOT LOGGED IN: Show the choice screen (Login or Registration)
                 NavigationView {
                     AuthLandingScreen(isLoggedIn: $isUserLoggedIn)
                 }

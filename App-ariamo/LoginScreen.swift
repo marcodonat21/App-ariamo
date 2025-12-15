@@ -7,58 +7,63 @@ struct LoginScreen: View {
     
     var body: some View {
         ZStack {
-            // SFONDO
+            // BACKGROUND
             Image("app_foto")
                 .resizable()
                 .scaledToFill()
                 .edgesIgnoringSafeArea(.all)
                 .overlay(Color.white.opacity(0.92))
             
-            VStack(spacing: 30) {
-                // TITOLO PERSONALIZZATO (Verde)
-                Text("Hello, we are happy\nto see you again!")
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundColor(.appGreen)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 80) // Spazio dall'alto
-                
-                // CAMPI
-                VStack(spacing: 20) {
-                    CustomTextField(placeholder: "Email", text: $email)
-                    CustomTextField(placeholder: "Password", text: $password, isSecure: true)
-                }
-                
-                // PASSWORD DIMENTICATA
-                HStack {
-                    Spacer()
-                    Button("Forgot Password?") { }
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundColor(.gray)
-                }
-                .padding(.horizontal, 50)
-                
-                // BOTTONE "Go!" (Ora subito sotto, non in fondo)
-                Button(action: {
-                    withAnimation { isLoggedIn = true }
-                }) {
-                    Text("Go!")
-                        .font(.system(.headline, design: .rounded))
+            // CONTENUTO RESO SCORREVOLE PER PREVENIRE IL SALTO
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 30) {
+                    // CUSTOM TITLE (Green)
+                    Text("Hello, we are happy\nto see you again!")
+                        .font(.system(.title2, design: .rounded))
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 120)
-                        .background(Color.appGreen)
-                        .cornerRadius(30)
-                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                        .foregroundColor(.appGreen)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 80)
+                    
+                    // FIELDS
+                    VStack(spacing: 20) {
+                        CustomTextField(placeholder: "Email", text: $email)
+                        CustomTextField(placeholder: "Password", text: $password, isSecure: true)
+                    }
+                    
+                    // FORGOT PASSWORD
+                    HStack {
+                        Spacer()
+                        Button("Forgot Password?") { }
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 50)
+                    
+                    // "Go!" BUTTON
+                    Button(action: {
+                        withAnimation { isLoggedIn = true }
+                    }) {
+                        Text("Go!")
+                            .font(.system(.headline, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(width: 120)
+                            .background(Color.appGreen)
+                            .cornerRadius(30)
+                            .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.top, 10)
+                    
+                    Spacer() // Pushes the content up (but contained in ScrollView)
                 }
-                .padding(.top, 10) // Un po' di aria sopra il bottone
-                
-                Spacer() // Spinge tutto il blocco verso l'alto/centro
+                .padding()
+                .frame(minHeight: UIScreen.main.bounds.height) // Forziamo l'altezza minima
             }
-            .padding()
         }
-        // NASCONDE IL TITOLO STANDARD "LOGIN"
+        // MODIFICATORE FONDAMENTALE: Ignora il movimento della tastiera
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .navigationBarHidden(true)
     }
 }

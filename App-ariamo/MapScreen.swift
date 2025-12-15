@@ -11,7 +11,7 @@ struct MapLocation: Identifiable {
 
 struct MapScreen: View {
     @Binding var searchText: String
-    @Binding var isSearchActive: Bool // Riceviamo lo stato della ricerca
+    @Binding var isSearchActive: Bool // Receive the search state // Translated Comment
     
     @State private var selectedLocation: MapLocation? = nil
     @State private var navigateToDetail = false
@@ -22,25 +22,25 @@ struct MapScreen: View {
     )
     
     let allLocations = [
-        MapLocation(name: "Pizzeria da Michele", coordinate: CLLocationCoordinate2D(latitude: 40.8498, longitude: 14.2633), imageName: "fork.knife", description: "La pizza più famosa di Napoli."),
-        MapLocation(name: "Stadio Maradona", coordinate: CLLocationCoordinate2D(latitude: 40.8279, longitude: 14.1930), imageName: "figure.soccer", description: "Il tempio del calcio."),
-        MapLocation(name: "Lungomare", coordinate: CLLocationCoordinate2D(latitude: 40.8322, longitude: 14.2426), imageName: "sun.max.fill", description: "Passeggiata con vista Vesuvio.")
+        MapLocation(name: "Da Michele Pizzeria", coordinate: CLLocationCoordinate2D(latitude: 40.8498, longitude: 14.2633), imageName: "fork.knife", description: "Naples' most famous pizza."), // Translated
+        MapLocation(name: "Maradona Stadium", coordinate: CLLocationCoordinate2D(latitude: 40.8279, longitude: 14.1930), imageName: "figure.soccer", description: "The temple of football."), // Translated
+        MapLocation(name: "Waterfront", coordinate: CLLocationCoordinate2D(latitude: 40.8322, longitude: 14.2426), imageName: "sun.max.fill", description: "Walk with a view of Vesuvius.") // Translated
     ]
     
     var body: some View {
         ZStack(alignment: .bottom) {
             
-            // 1. MAPPA
+            // 1. MAP
             Map(coordinateRegion: $region, annotationItems: filteredLocations) { location in
                 MapAnnotation(coordinate: location.coordinate) {
                     Button(action: {
                         withAnimation(.spring()) {
-                            // Quando clicco un PIN: Chiudo la ricerca e la tastiera
+                            // When I click a PIN: Close search and keyboard // Translated Comment
                             isSearchActive = false
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                             
-                            // Apro l'anteprima
-                            selectedLocation = location
+                            // Open the preview
+                            selectedLocation = location // Translated Comment
                         }
                     }) {
                         VStack(spacing: 4) {
@@ -69,16 +69,16 @@ struct MapScreen: View {
                 }
             }
             .edgesIgnoringSafeArea(.all)
-            // Tap sulla mappa vuota chiude l'anteprima
+            // Tap on empty map closes the preview // Translated Comment
             .onTapGesture { withAnimation { selectedLocation = nil } }
             
-            // Link Invisibile navigazione
+            // Invisible navigation Link // Translated Comment
             NavigationLink(isActive: $navigateToDetail) {
                 if let loc = selectedLocation { ActivityDetailView(location: loc) }
             } label: { EmptyView() }
 
-            // 2. ANTEPRIMA CARD
-            if let location = selectedLocation {
+            // 2. PREVIEW CARD
+            if let location = selectedLocation { // Translated Comment
                 ZStack(alignment: .topTrailing) {
                     HStack(alignment: .center, spacing: 15) {
                         ZStack {
@@ -114,8 +114,8 @@ struct MapScreen: View {
         }
         .navigationBarHidden(true)
         
-        // --- NUOVO: ASCOLTATORE ---
-        // Se isSearchActive diventa TRUE (apri la ricerca), chiudi l'anteprima.
+        // --- NEW: LISTENER --- // Translated Comment
+        // If isSearchActive becomes TRUE (open search), close the preview. // Translated Comment
         .onChange(of: isSearchActive) { isActive in
             if isActive {
                 withAnimation {

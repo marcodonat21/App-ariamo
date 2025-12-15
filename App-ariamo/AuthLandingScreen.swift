@@ -5,35 +5,35 @@ struct AuthLandingScreen: View {
     
     var body: some View {
         ZStack {
-            // 1. SFONDO
+            // 1. BACKGROUND
             Image("app_foto")
                 .resizable()
                 .scaledToFill()
                 .edgesIgnoringSafeArea(.all)
                 .overlay(Color.white.opacity(0.92))
             
-            // 2. CONTENUTO
+            // 2. CONTENT
             VStack(spacing: 25) {
                 Spacer()
                 
-                // Titolo
+                // Title
                 Text("app-ariamo")
-                    .font(.system(size: 40, weight: .heavy, design: .rounded)) // Peso definito qui
+                    .font(.system(size: 40, weight: .heavy, design: .rounded))
                     .foregroundColor(.appGreen)
                     .padding(.bottom, 10)
                 
-                Text("Benvenuto! Scegli come accedere.")
+                Text("Welcome! Choose how to access.") // Translated
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(.gray)
                     .padding(.bottom, 40)
                 
-                // BOTTONE REGISTRAZIONE
+                // REGISTRATION BUTTON
                 NavigationLink {
-                    RegistrationStep1(isLoggedIn: $isLoggedIn) // <--- CAMBIA QUI
+                    RegistrationStep1(isLoggedIn: $isLoggedIn)
                 } label: {
-                    Text("Crea un Account")
+                    Text("Create Account") // Translated
                         .font(.system(.body, design: .rounded))
-                        .fontWeight(.bold) // CORRETTO: Fuori dalle parentesi del font
+                        .fontWeight(.bold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -42,13 +42,13 @@ struct AuthLandingScreen: View {
                 }
                 .padding(.horizontal, 40)
                 
-                // BOTTONE LOGIN
+                // LOGIN BUTTON
                 NavigationLink {
                     LoginScreen(isLoggedIn: $isLoggedIn)
                 } label: {
-                    Text("Accedi (Login)")
+                    Text("Login") // Simplified translation (was "Accedi (Login)")
                         .font(.system(.body, design: .rounded))
-                        .fontWeight(.bold) // CORRETTO
+                        .fontWeight(.bold)
                         .foregroundColor(.appGreen)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -63,7 +63,7 @@ struct AuthLandingScreen: View {
                 
                 // SOCIAL
                 VStack(spacing: 15) {
-                    Text("oppure accedi con")
+                    Text("or log in with") // Translated
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.gray)
                     

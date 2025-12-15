@@ -1,26 +1,39 @@
 import SwiftUI
 
 struct ActivityListScreen: View {
-    // Usa la definizione globale di Activity presente in AppConstants.swift
+    // Uses the global Activity definition (assuming it's defined in AppConstants.swift)
     let activities = [
-        Activity(title: "Sport", imageName: "sport", color: .red),
-        Activity(title: "Travel & Adventure", imageName: "airplane", color: .orange),
-        Activity(title: "Party", imageName: "party", color: .yellow),
-        Activity(title: "Studying", imageName: "sun.max.fill", color: .VERDE)
+        // Order MUST be: (title, imageName, color, description)
+        Activity(title: "Sports", imageName: "figure.run", color: .red, description: "Group events focused on physical activity."),
+        Activity(title: "Travel & Adventure", imageName: "airplane", color: .orange, description: "Trips, excursions, and new discoveries."),
+        Activity(title: "Party & Fun", imageName: "party.popper.fill", color: .yellow, description: "Nights out and social gatherings."),
+        Activity(title: "Studying & Learning", imageName: "book.fill", color: .appGreen, description: "Study sessions and cultural events.")
     ]
 
     var body: some View {
-        // Rimuoviamo NavigationView interna perché c'è già in ContentView
         ScrollView {
             VStack(spacing: 20) {
+                // SECTION TITLE
+                Text("Find an activity type")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.appGreen)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top)
+
                 ForEach(activities) { activity in
-                    ActivityCard(activity: activity)
+                    // NavigationLink added to make the card clickable
+                    NavigationLink(destination: Text("Detail screen for \(activity.title)")) {
+                         ActivityCard(activity: activity)
+                    }
+                    .buttonStyle(PlainButtonStyle()) // Removes the default NavigationLink effect
                 }
             }
             .padding()
-            .padding(.bottom, 90) // PADDING EXTRA per la barra custom
+            .padding(.bottom, 90) // EXTRA PADDING for custom tab bar
         }
         .navigationTitle("Activities")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 
@@ -29,45 +42,38 @@ struct ActivityCard: View {
     let activity: Activity
     var body: some View {
         ZStack(alignment: .bottomLeading) {
+            // 1. MAIN BACKGROUND COLOR
             Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(height: 150)
-                .cornerRadius(15)
-                .overlay(
-                    Image(systemName: activity.imageName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 50)
-                        .foregroundColor(.white.opacity(0.5))
-                )
-            VStack(alignment: .leading) {
+                .fill(activity.color)
+                .frame(height: 180) // Fixed height
+                .cornerRadius(25)
+            
+            // 2. LARGE SEMI-TRANSPARENT ICON (overlay on the entire card)
+            Image(systemName: activity.imageName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120) // Larger icon to fill
+                .foregroundColor(.white.opacity(0.3)) // Semi-transparent icon
+                .offset(x: 100, y: -20)
+                .rotationEffect(.degrees(-15)) // A bit of style
+            
+            // 3. TEXT CONTENT (Bottom Left)
+            VStack(alignment: .leading, spacing: 5) {
+                // Title
                 Text(activity.title)
-                    .fontWeight(.semibold)
+                    .fontWeight(.heavy)
                     .foregroundStyle(.white)
                     .font(.title)
                 
-                Spacer()
-
-                Image(activity.imageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 100, height: 100)
-                    .foregroundStyle(.white.opacity(0.8))
+                // Description
+                Text(activity.description)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(2)
             }
-            .padding(.top)
+            .padding([.leading, .bottom], 25)
         }
-        .padding()
-        .frame(width: 380, height: 180, alignment: .leading)
-        .background(activity.color)
-        .clipShape(RoundedRectangle(cornerRadius: 25))
-    }
-}
-
-
-struct ActivityListScreen_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            ActivityListScreen()
-        }
+        .frame(maxWidth: .infinity)
+        .shadow(color: activity.color.opacity(0.3), radius: 10, x: 0, y: 5)
     }
 }
