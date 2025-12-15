@@ -1,10 +1,9 @@
 import SwiftUI
 import Foundation
+import Combine
 
 // --- 1. COLOR CONFIGURATION ---
 extension Color {
-    // Note: Assuming appGreen, appMint, appDarkText are defined elsewhere or implicitly used
-    // Default system colors
     static let inputGray = Color(UIColor.systemGray6)
     
     // Glassmorphism Colors
@@ -26,38 +25,84 @@ enum Tab {
 
 // --- 3. DATA MODELS ---
 
-struct Activity: Identifiable {
+// Global Manager for Joined Activities (Singleton)
+class ActivityManager: ObservableObject {
+    static let shared = ActivityManager()
+    
+    @Published var joinedActivities: [Activity] = []
+    
+    // Funzione per partecipare
+    func join(activity: Activity) {
+        if !joinedActivities.contains(where: { $0.id == activity.id }) {
+            joinedActivities.append(activity)
+        }
+    }
+    
+    // NUOVA FUNZIONE: Per cancellare la partecipazione
+    func leave(activity: Activity) {
+        joinedActivities.removeAll { $0.id == activity.id }
+    }
+    
+    // Helper per controllare lo stato
+    func isJoined(activity: Activity) -> Bool {
+        return joinedActivities.contains(where: { $0.id == activity.id })
+    }
+}
+
+// --- 4. VALIDATION UTILS ---
+struct Validator {
+    static func isValidEmail(_ email: String) -> Bool {
+        // Controllo semplice: deve avere @ e .
+        // Esempio regex più robusta:
+        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
+        return emailPred.evaluate(with: email)
+    }
+    
+    static func isValidPassword(_ password: String) -> Bool {
+        // Regole: Min 8 caratteri, almeno 1 numero, almeno 1 carattere speciale (punteggiatura)
+        // (?=.*[0-9]) -> almeno un numero
+        // (?=.*[^A-Za-z0-9]) -> almeno un carattere speciale
+        // .{8,} -> lunghezza minima 8
+        let passwordRegEx = "^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$"
+        let passwordPred = NSPredicate(format:"SELF MATCHES %@", passwordRegEx)
+        return passwordPred.evaluate(with: password)
+    }
+}
+
+struct Activity: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let imageName: String
-    let color: Color // PARAMETRO NECESSARIO
-    var description: String = "Activity description..." // L'ho spostato in fondo per il default
+    let color: Color
+    var description: String = "Activity description..."
+    
+    static func == (lhs: Activity, rhs: Activity) -> Bool {
+        return lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
-struct DatiEvento { // Event Data
-    var tipo: String = "" // Type
-    var data: Date = Date() // Date
-    var luogo: String = "" // Location
+struct DatiEvento {
+    var tipo: String = ""
+    var data: Date = Date()
+    var luogo: String = ""
 }
 
 struct UserProfile {
-    // Basic Info
     var name: String
     var surname: String
     var age: Int
     var gender: String
     var bio: String
     var motto: String
-    
-    // PROFILE PHOTO
-    var image: String // Fallback (default avatar)
-    var profileImageData: Data? = nil // NEW: Real photo data saved here
-    
-    // Account
+    var image: String
+    var profileImageData: Data? = nil
     var email: String
     var password: String
-    
-    // Interests and Preferences
     var interests: Set<String>
     var shareLocation: Bool
     var notifications: Bool

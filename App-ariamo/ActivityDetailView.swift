@@ -1,84 +1,138 @@
 import SwiftUI
-import MapKit // Essential for CLLocationCoordinate2D
 
 struct ActivityDetailView: View {
-    let location: MapLocation
+    let activity: Activity
+    @Environment(\.presentationMode) var presentationMode
+    
+    // Osserviamo il manager per reagire ai cambiamenti di stato
+    @ObservedObject var manager = ActivityManager.shared
+    
+    @State private var showSuccess = false
+    
+    // Calcoliamo dinamicamente se partecipiamo
+    var isAlreadyJoined: Bool {
+        manager.isJoined(activity: activity)
+    }
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+        ZStack {
+            VStack(spacing: 0) {
                 // Header Image
-                Rectangle()
-                    .fill(Color.appGreen.opacity(0.1))
-                    .frame(height: 250)
-                    .overlay(
-                        Image(systemName: location.imageName)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 100)
-                            .foregroundColor(.appGreen)
-                    )
+                ZStack(alignment: .topLeading) {
+                    Image("app_foto")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 300)
+                        .clipped()
+                        .ignoresSafeArea()
+                    
+                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Circle())
+                    }
+                    .padding(.top, 50)
+                    .padding(.leading, 20)
+                }
                 
+                // Content
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(location.name)
-                        .font(.largeTitle)
-                        .bold()
+                    HStack {
+                        Text(activity.title)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        Spacer()
+                        Image(systemName: activity.imageName)
+                            .font(.largeTitle)
+                            .foregroundColor(activity.color)
+                    }
+                    
+                    Text(activity.description)
+                        .font(.body)
+                        .foregroundColor(.gray)
                     
                     HStack {
-                        Label("Naples, NA", systemImage: "mappin.and.ellipse") // Tradotto
-                        Spacer()
-                        Label("Open now", systemImage: "clock") // Tradotto
-                            .foregroundColor(.green)
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundColor(.red)
+                        Text("Naples, Italy")
+                            .font(.subheadline)
                     }
-                    .foregroundColor(.gray)
-                    .font(.subheadline)
                     
-                    Divider()
+                    // STATUS INDICATOR (Se partecipi già)
+                    if isAlreadyJoined {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.appGreen)
+                            Text("Status: ALREADY JOINED")
+                                .font(.headline)
+                                .foregroundColor(.appGreen)
+                        }
+                        .padding(.top, 5)
+                    }
                     
-                    Text("Information") // Tradotto
-                        .font(.title2)
-                        .bold()
+                    Spacer()
                     
-                    Text(location.description)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .lineSpacing(5)
-                    
-                    // Testo placeholder (lasciato in Latin/placeholder style)
-                    Text("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.")
-                        .foregroundColor(.secondary)
-                    
-                    Spacer(minLength: 50)
-                    
-                    Button(action: {}) {
-                        Text("Join Event") // Tradotto
-                            .bold()
+                    // DYNAMIC ACTION BUTTON
+                    Button(action: {
+                        if isAlreadyJoined {
+                            // LOGICA LEAVE (CANCELLA PARTECIPAZIONE)
+                            manager.leave(activity: activity)
+                            presentationMode.wrappedValue.dismiss() // Torna indietro dopo aver cancellato
+                        } else {
+                            // LOGICA JOIN (PARTECIPA)
+                            manager.join(activity: activity)
+                            withAnimation { showSuccess = true }
+                        }
+                    }) {
+                        Text(isAlreadyJoined ? "Leave Activity" : "Join Activity")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.appGreen)
-                            .foregroundColor(.white)
-                            .cornerRadius(15)
+                            .background(isAlreadyJoined ? Color.red : Color.appGreen) // ROSSO se joined, VERDE se new
+                            .cornerRadius(25)
+                            .shadow(color: (isAlreadyJoined ? Color.red : Color.appGreen).opacity(0.3), radius: 10, x: 0, y: 5)
                     }
+                    .padding(.bottom, 30)
                 }
                 .padding(25)
                 .background(Color.white)
                 .cornerRadius(30)
-                .offset(y: -30) // Overlap effect
+                .offset(y: -40)
+            }
+            
+            // SUCCESS OVERLAY (Solo quando ti unisci)
+            if showSuccess {
+                SuccessOverlay(onClose: {
+                    showSuccess = false
+                    presentationMode.wrappedValue.dismiss()
+                })
             }
         }
-        .edgesIgnoringSafeArea(.top)
+        .ignoresSafeArea(.all, edges: .top)
+        .navigationBarHidden(true)
     }
 }
 
-// --- PREVIEW (Assuming MapLocation is defined elsewhere) ---
-struct ActivityDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        ActivityDetailView(location: MapLocation(
-            name: "Example Pizzeria", // Tradotto
-            // FIX: Explicit coordinates
-            coordinate: CLLocationCoordinate2D(latitude: 40.8518, longitude: 14.2681),
-            imageName: "fork.knife",
-            description: "Sample description for the preview." // Tradotto
-        ))
+// Success Overlay (Invariato)
+struct SuccessOverlay: View {
+    var onClose: () -> Void
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 80)).foregroundColor(.appGreen).padding(.top, 20)
+                Text("Bravo!").font(.largeTitle).fontWeight(.heavy).foregroundColor(.black)
+                Text("You have successfully joined\nthis event.").font(.body).multilineTextAlignment(.center).foregroundColor(.gray)
+                Divider()
+                Button(action: onClose) {
+                    Text("OK, Great!").font(.headline).foregroundColor(.white).padding().frame(maxWidth: .infinity).background(Color.appGreen).cornerRadius(20)
+                }.padding(.horizontal).padding(.bottom, 20)
+            }.frame(width: 300).background(Color.white).cornerRadius(25).shadow(radius: 20).transition(.scale)
+        }
     }
 }
