@@ -3,10 +3,10 @@ import SwiftUI
 struct ActivityListScreen: View {
     // Usa la definizione globale di Activity presente in AppConstants.swift
     let activities = [
-        Activity(title: "Sport", imageName: "figure.run"),
-        Activity(title: "Travel & Adventure", imageName: "airplane"),
-        Activity(title: "Party", imageName: "music.note"),
-        Activity(title: "Holiday", imageName: "sun.max.fill")
+        Activity(title: "Sport", imageName: "sport", color: .red),
+        Activity(title: "Travel & Adventure", imageName: "airplane", color: .orange),
+        Activity(title: "Party", imageName: "party", color: .yellow),
+        Activity(title: "Studying", imageName: "sun.max.fill", color: .VERDE)
     ]
 
     var body: some View {
@@ -42,17 +42,28 @@ struct ActivityCard: View {
                 )
             VStack(alignment: .leading) {
                 Text(activity.title)
-                    .font(.title3)
-                    .bold()
-                    .foregroundColor(.white)
-                    .shadow(radius: 2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .font(.title)
+                
+                Spacer()
+
+                Image(activity.imageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 100, height: 100)
+                    .foregroundStyle(.white.opacity(0.8))
             }
-            .padding()
+            .padding(.top)
         }
+        .padding()
+        .frame(width: 380, height: 180, alignment: .leading)
+        .background(activity.color)
+        .clipShape(RoundedRectangle(cornerRadius: 25))
     }
 }
 
-// --- PREVIEW ---
+
 struct ActivityListScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {

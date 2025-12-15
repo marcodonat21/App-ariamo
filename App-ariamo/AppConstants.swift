@@ -29,6 +29,7 @@ struct Activity: Identifiable {
     let title: String
     let imageName: String
     var description: String = "Descrizione dell'attività..."
+    let color: Color
 }
 
 struct DatiEvento {
