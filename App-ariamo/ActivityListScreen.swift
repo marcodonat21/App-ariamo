@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ActivityListScreen: View {
-    // Dati fittizi (Activity è definito in AppConstants)
+    // Usa la definizione globale di Activity presente in AppConstants.swift
     let activities = [
         Activity(title: "Sport", imageName: "sport", color: .red),
         Activity(title: "Travel & Adventure", imageName: "airplane", color: .orange),
@@ -10,27 +10,37 @@ struct ActivityListScreen: View {
     ]
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    ForEach(activities) { activity in
-                        ActivityCard(activity: activity)
-                    }
+        // Rimuoviamo NavigationView interna perché c'è già in ContentView
+        ScrollView {
+            VStack(spacing: 20) {
+                ForEach(activities) { activity in
+                    ActivityCard(activity: activity)
                 }
-                .padding()
             }
-            .navigationTitle("Activities")
+            .padding()
+            .padding(.bottom, 90) // PADDING EXTRA per la barra custom
         }
+        .navigationTitle("Activities")
     }
 }
 
-// Componente Card Attività
+// ActivityCard
 struct ActivityCard: View {
     let activity: Activity
-    
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
+        ZStack(alignment: .bottomLeading) {
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 150)
+                .cornerRadius(15)
+                .overlay(
+                    Image(systemName: activity.imageName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 50)
+                        .foregroundColor(.white.opacity(0.5))
+                )
+            VStack(alignment: .leading) {
                 Text(activity.title)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
@@ -56,6 +66,8 @@ struct ActivityCard: View {
 
 struct ActivityListScreen_Previews: PreviewProvider {
     static var previews: some View {
-        ActivityListScreen()
+        NavigationView {
+            ActivityListScreen()
+        }
     }
 }

@@ -1,55 +1,70 @@
 import SwiftUI
 
-// --- LOGIN SCREEN ---
 struct LoginScreen: View {
     @Binding var isLoggedIn: Bool
     @State private var email = ""
     @State private var password = ""
     
     var body: some View {
-        VStack(spacing: 25) {
-            Text("Hello, we are happy\nto see you again!")
-                .font(.title2)
-                .bold()
-                .multilineTextAlignment(.center)
-                .padding(.top, 50)
+        ZStack {
+            // SFONDO
+            Image("app_foto")
+                .resizable()
+                .scaledToFill()
+                .edgesIgnoringSafeArea(.all)
+                .overlay(Color.white.opacity(0.92))
             
-            // I campi di testo riutilizzabili
-            CustomTextField(placeholder: "Email", text: $email)
-            CustomTextField(placeholder: "Password", text: $password, isSecure: true)
-            
-            HStack {
-                Spacer()
-                Button("Forgot Password?") { }
-                    .font(.caption)
-                    .foregroundColor(.gray)
+            VStack(spacing: 30) {
+                // TITOLO PERSONALIZZATO (Verde)
+                Text("Hello, we are happy\nto see you again!")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundColor(.appGreen)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 80) // Spazio dall'alto
+                
+                // CAMPI
+                VStack(spacing: 20) {
+                    CustomTextField(placeholder: "Email", text: $email)
+                    CustomTextField(placeholder: "Password", text: $password, isSecure: true)
+                }
+                
+                // PASSWORD DIMENTICATA
+                HStack {
+                    Spacer()
+                    Button("Forgot Password?") { }
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 50)
+                
+                // BOTTONE "Go!" (Ora subito sotto, non in fondo)
+                Button(action: {
+                    withAnimation { isLoggedIn = true }
+                }) {
+                    Text("Go!")
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(width: 120)
+                        .background(Color.appGreen)
+                        .cornerRadius(30)
+                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                }
+                .padding(.top, 10) // Un po' di aria sopra il bottone
+                
+                Spacer() // Spinge tutto il blocco verso l'alto/centro
             }
-            .padding(.horizontal, 40)
-            
-            Spacer()
-            
-            // Azione di Login
-            Button(action: {
-                // SIMULAZIONE LOGIN RIUSCITO
-                withAnimation { isLoggedIn = true }
-            }) {
-                Text("Go!")
-                    .bold()
-                    .foregroundColor(.black)
-                    .padding()
-                    .frame(width: 100)
-                    .background(Color.appMint.opacity(0.3))
-                    .cornerRadius(25)
-            }
-            .padding(.bottom, 50)
+            .padding()
         }
-        .padding()
+        // NASCONDE IL TITOLO STANDARD "LOGIN"
+        .navigationBarHidden(true)
     }
 }
 
-// --- PREVIEW ---
-struct LoginScreen_Previews: PreviewProvider {
-    static var previews: some View {
+#Preview {
+    NavigationView {
         LoginScreen(isLoggedIn: .constant(false))
     }
 }

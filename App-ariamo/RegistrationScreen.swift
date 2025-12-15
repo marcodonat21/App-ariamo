@@ -1,267 +1,281 @@
 import SwiftUI
 
-// --- 1. CREATE ACCOUNT - STEP 1 (Dati base) ---
-struct CreateAccountStep1: View {
+// --- STEP 1: CREDENZIALI & NOME ---
+struct RegistrationStep1: View {
     @Binding var isLoggedIn: Bool
+    
+    // Dati di questo step
     @State private var name = ""
     @State private var surname = ""
-    @State private var age = 18
     @State private var email = ""
     @State private var password = ""
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                Text("Create an account")
-                    .font(.title2)
-                    .bold()
-                    .padding(.top)
+        ZStack {
+            // Sfondo
+            Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
+            
+            VStack(spacing: 25) {
+                // Titolo
+                Text("Step 1/4")
+                    .font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray).padding(.top, 60)
+                Text("Chi sei?")
+                    .font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
                 
-                CustomTextField(placeholder: "Name", text: $name)
-                CustomTextField(placeholder: "Surname", text: $surname)
-                
-                // Selettore Età
-                HStack {
-                    Text("Age (years)")
-                        .foregroundColor(.gray)
-                    Spacer()
-                    Picker("", selection: $age) {
-                        ForEach(18...100, id: \.self) { Text("\($0)") }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                    .padding(5)
-                    .background(Color.inputGray)
-                    .cornerRadius(10)
+                // Campi
+                VStack(spacing: 20) {
+                    CustomTextField(placeholder: "Nome", text: $name)
+                    CustomTextField(placeholder: "Cognome", text: $surname)
+                    CustomTextField(placeholder: "Email", text: $email)
+                    CustomTextField(placeholder: "Password", text: $password, isSecure: true)
                 }
-                .padding(.horizontal, 40)
                 
-                CustomTextField(placeholder: "Enter your email", text: $email)
-                CustomTextField(placeholder: "Create a Password", text: $password, isSecure: true)
-                CustomTextField(placeholder: "Repeat Password", text: $password, isSecure: true)
+                Spacer()
                 
-                Spacer(minLength: 50)
-                
-                NavigationLink(destination: CreateAccountStep2(isLoggedIn: $isLoggedIn)) {
-                    Text("Go!")
-                        .bold()
-                        .foregroundColor(.black)
+                // Bottone "Continua"
+                NavigationLink(destination: RegistrationStep2(isLoggedIn: $isLoggedIn)) {
+                    Text("Continua")
+                        .font(.system(.headline, design: .rounded).bold())
+                        .foregroundColor(.white)
                         .padding()
-                        .frame(width: 100)
-                        .background(Color.appMint.opacity(0.3))
-                        .cornerRadius(25)
+                        .frame(width: 140)
+                        .background(Color.appGreen)
+                        .cornerRadius(30)
+                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
                 }
+                .padding(.bottom, 60)
             }
             .padding()
         }
+        .navigationBarHidden(true)
     }
 }
 
-// --- 2. CREATE ACCOUNT - STEP 2 (Profilo) ---
-struct CreateAccountStep2: View {
+// --- STEP 2: DETTAGLI PERSONALI (FIX GENERE) ---
+struct RegistrationStep2: View {
     @Binding var isLoggedIn: Bool
     @State private var bio = ""
     @State private var motto = ""
+    @State private var age = 18
     @State private var gender = "Man"
     
-    var body: some View {
-        VStack(spacing: 25) {
-            Text("Complete your account")
-                .font(.title2)
-                .bold()
-            
-            Text("Upload a profile picture")
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 80))
-                .foregroundColor(.gray)
-            
-            // Gender Picker Custom (Componente riutilizzabile)
-            HStack(spacing: 20) {
-                GenderButton(title: "Man", isSelected: gender == "Man") { gender = "Man" }
-                GenderButton(title: "Woman", isSelected: gender == "Woman") { gender = "Woman" }
-            }
-            
-            CustomTextField(placeholder: "Tell us about yourself (Bio)", text: $bio)
-            CustomTextField(placeholder: "Insert your motto here", text: $motto)
-            
-            Spacer()
-            
-            NavigationLink(destination: InterestsScreen(isLoggedIn: $isLoggedIn)) {
-                Text("Go!")
-                    .bold()
-                    .foregroundColor(.black)
-                    .padding()
-                    .frame(width: 100)
-                    .background(Color.appMint.opacity(0.3))
-                    .cornerRadius(25)
-            }
-            .padding(.bottom, 30)
-        }
-    }
-}
-
-// --- 3. SELEZIONE INTERESSI (Griglia Sport) ---
-struct InterestsScreen: View {
-    @Binding var isLoggedIn: Bool
-    
-    let sports = [
-        ("Swimming", "figure.pool.swim"),
-        ("Hiking", "figure.hiking"),
-        ("Gym", "dumbbell.fill"),
-        ("Cycle", "bicycle"),
-        ("Tennis", "tennis.racket"),
-        ("Volleyball", "figure.volleyball")
-    ]
-    
-    @State private var selectedSports: Set<String> = []
-    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        VStack {
-            Text("Selected a sport")
-                .font(.title2)
-                .bold()
-                .padding()
+        ZStack {
+            Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
             
-            Text("Select your favorite hobby")
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            LazyVGrid(columns: columns, spacing: 15) {
-                ForEach(sports, id: \.0) { sport in
-                    Button(action: {
-                        if selectedSports.contains(sport.0) {
-                            selectedSports.remove(sport.0)
-                        } else {
-                            selectedSports.insert(sport.0)
+            VStack(spacing: 25) {
+                // Header con tasto indietro custom
+                ZStack {
+                    HStack {
+                        Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                            Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen)
                         }
-                    }) {
-                        SportInterestCard(name: sport.0, icon: sport.1, isSelected: selectedSports.contains(sport.0))
+                        Spacer()
+                    }
+                    VStack {
+                        Text("Step 2/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                        Text("Parlaci di te").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
                     }
                 }
+                .padding(.top, 60)
+                
+                // Campi
+                VStack(spacing: 20) {
+                    CustomTextField(placeholder: "Bio (es. Amo lo sport)", text: $bio)
+                    CustomTextField(placeholder: "Il tuo Motto", text: $motto)
+                    
+                    // --- FIX QUI SOTTO ---
+                    // Età e Genere sulla stessa riga
+                    HStack(spacing: 10) {
+                        // Picker Genere
+                        HStack(spacing: 5) {
+                            Text("Genere:")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundColor(.gray)
+                                .lineLimit(1) // Impedisce a capo
+                                .fixedSize()  // Forza la larghezza del testo
+                            
+                            Picker("", selection: $gender) {
+                                Text("Uomo").tag("Man")
+                                Text("Donna").tag("Woman")
+                            }
+                            .accentColor(.appGreen)
+                            .labelsHidden()
+                            .fixedSize() // *** FIX IMPORTANTE: Impedisce che "Uomo" vada a capo ***
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 15)
+                        .background(Color.white)
+                        .cornerRadius(30)
+                        
+                        Spacer()
+                        
+                        // Stepper Età
+                        HStack(spacing: 5) {
+                            Text("Età: \(age)")
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                                .fixedSize()
+                            
+                            Stepper("", value: $age, in: 18...99)
+                                .labelsHidden()
+                                .scaleEffect(0.9) // Rimpicciolisce leggermente lo stepper per farlo entrare meglio
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 15)
+                        .background(Color.white)
+                        .cornerRadius(30)
+                    }
+                    .padding(.horizontal, 10) // Padding esterno ridotto per dare più spazio
+                }
+                
+                Spacer()
+                
+                NavigationLink(destination: RegistrationStep3(isLoggedIn: $isLoggedIn)) {
+                    Text("Continua")
+                        .font(.system(.headline, design: .rounded).bold())
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(width: 140)
+                        .background(Color.appGreen)
+                        .cornerRadius(30)
+                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                }
+                .padding(.bottom, 60)
             }
             .padding()
-            
-            Spacer()
-            
-            NavigationLink(destination: PreferencesScreen(isLoggedIn: $isLoggedIn)) {
-                Text("Go!")
-                    .bold()
-                    .foregroundColor(.black)
-                    .padding()
-                    .frame(width: 100)
-                    .background(Color.appMint.opacity(0.3))
-                    .cornerRadius(25)
-            }
-            .padding(.bottom, 30)
         }
+        .navigationBarHidden(true)
     }
 }
 
-// Sottocomponente locale per Card Sport
-struct SportInterestCard: View {
-    let name: String
-    let icon: String
-    let isSelected: Bool
-    
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            Rectangle()
-                .fill(isSelected ? Color.appMint : Color.gray.opacity(0.3))
-                .frame(height: 100)
-                .cornerRadius(15)
-                
-            VStack(alignment: .leading) {
-                Image(systemName: icon)
-                    .font(.title)
-                    .padding(5)
-                Text(name)
-                    .font(.headline)
-                    .padding(5)
-            }
-            .foregroundColor(.white)
-        }
-    }
-}
-
-// --- 4. PREFERENZE (Running toggle e slider) ---
-struct PreferencesScreen: View {
+// --- STEP 3: SPORT ---
+struct RegistrationStep3: View {
     @Binding var isLoggedIn: Bool
-    @State private var locationToggle = true
-    @State private var notificationToggle = true
-    @State private var distance: Double = 5.0
+    @State private var selectedSports: Set<String> = []
+    @Environment(\.presentationMode) var presentationMode
+    
+    let sports = [("Nuoto", "figure.pool.swim"), ("Trekking", "figure.hiking"), ("Palestra", "dumbbell.fill"), ("Bici", "bicycle"), ("Tennis", "tennis.racket"), ("Volley", "figure.volleyball")]
+    let columns = [GridItem(.adaptive(minimum: 100))]
     
     var body: some View {
-        VStack(spacing: 30) {
-            Image(systemName: "figure.run")
-                .font(.system(size: 60))
-                .foregroundColor(.black)
+        ZStack {
+            Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
             
-            Text("Running")
-                .font(.title)
-                .bold()
-            
-            Text("Pick your running preferences")
-                .foregroundColor(.gray)
-            
-            VStack(spacing: 20) {
-                Toggle("Share your live location", isOn: $locationToggle)
-                    .padding()
-                    .background(Color.inputGray)
-                    .cornerRadius(15)
+            VStack(spacing: 25) {
+                ZStack {
+                    HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen) }; Spacer() }
+                    VStack {
+                        Text("Step 3/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                        Text("I tuoi Sport").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
+                    }
+                }.padding(.top, 60)
                 
-                Toggle("Do you want to receive notification?", isOn: $notificationToggle)
-                    .padding()
-                    .background(Color.inputGray)
-                    .cornerRadius(15)
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 15) {
+                        ForEach(sports, id: \.0) { sport in
+                            Button(action: {
+                                if selectedSports.contains(sport.0) { selectedSports.remove(sport.0) }
+                                else { selectedSports.insert(sport.0) }
+                            }) {
+                                VStack {
+                                    Image(systemName: sport.1).font(.title2)
+                                    Text(sport.0).font(.caption).bold()
+                                }
+                                .frame(maxWidth: .infinity).padding(.vertical, 15)
+                                .background(selectedSports.contains(sport.0) ? Color.appGreen : Color.white)
+                                .foregroundColor(selectedSports.contains(sport.0) ? .white : .gray)
+                                .cornerRadius(20)
+                                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                            }
+                        }
+                    }.padding()
+                }
                 
-                VStack(alignment: .leading) {
-                    Text("Max. distance for events")
-                    Slider(value: $distance, in: 0...50, step: 1)
-                    Text("\(Int(distance)) km")
-                        .font(.headline)
-                        .foregroundColor(.appMint)
+                Spacer()
+                
+                NavigationLink(destination: RegistrationStep4(isLoggedIn: $isLoggedIn)) {
+                    Text("Continua")
+                        .font(.system(.headline, design: .rounded).bold())
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(width: 140)
+                        .background(Color.appGreen)
+                        .cornerRadius(30)
+                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
                 }
-                .padding()
-                .background(Color.inputGray)
-                .cornerRadius(15)
+                .padding(.bottom, 60)
             }
-            .padding(.horizontal)
-            
-            Spacer()
-            
-            // FINE DEL FLUSSO: Impostiamo isLoggedIn a TRUE
-            Button(action: {
-                withAnimation {
-                    isLoggedIn = true
-                }
-            }) {
-                Text("Go!")
-                    .bold()
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(width: 150)
-                    .background(Color.black)
-                    .cornerRadius(25)
-            }
-            .padding(.bottom, 50)
+            .padding()
         }
+        .navigationBarHidden(true)
     }
 }
 
-// --- PREVIEWS ---
-struct CreateAccountStep1_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            CreateAccountStep1(isLoggedIn: .constant(false))
+// --- STEP 4: PREFERENZE & FINE ---
+struct RegistrationStep4: View {
+    @Binding var isLoggedIn: Bool
+    @State private var sharePos = true
+    @State private var notif = true
+    @State private var dist = 10.0
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        ZStack {
+            Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
+            
+            VStack(spacing: 25) {
+                ZStack {
+                    HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen) }; Spacer() }
+                    VStack {
+                        Text("Step 4/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                        Text("Preferenze").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
+                    }
+                }.padding(.top, 60)
+                
+                VStack(spacing: 20) {
+                    VStack(spacing: 15) {
+                        Toggle("Condividi Posizione", isOn: $sharePos)
+                        Toggle("Ricevi Notifiche", isOn: $notif)
+                    }
+                    .padding().background(Color.white).cornerRadius(20).toggleStyle(SwitchToggleStyle(tint: .appGreen))
+                    
+                    VStack {
+                        Text("Distanza Max: \(Int(dist)) km").font(.caption).foregroundColor(.gray)
+                        Slider(value: $dist, in: 1...100, step: 1).accentColor(.appGreen)
+                    }
+                    .padding().background(Color.white).cornerRadius(20)
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+                
+                // BOTTONE GO FINALE
+                Button(action: {
+                    withAnimation { isLoggedIn = true }
+                }) {
+                    Text("Go!")
+                        .font(.system(.headline, design: .rounded).bold())
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(width: 140)
+                        .background(Color.appGreen)
+                        .cornerRadius(30)
+                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                }
+                .padding(.bottom, 60)
+            }
+            .padding()
         }
+        .navigationBarHidden(true)
     }
 }
 
-struct InterestsScreen_Previews: PreviewProvider {
-    static var previews: some View {
-        InterestsScreen(isLoggedIn: .constant(false))
+#Preview {
+    NavigationView {
+        RegistrationStep2(isLoggedIn: .constant(false))
     }
 }
