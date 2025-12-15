@@ -1,10 +1,10 @@
 import SwiftUI
 
-// --- STEP 1: CREDENZIALI & NOME ---
+// --- STEP 1: CREDENTIALS & NAME ---
 struct RegistrationStep1: View {
     @Binding var isLoggedIn: Bool
     
-    // Dati di questo step
+    // Data for this step
     @State private var name = ""
     @State private var surname = ""
     @State private var email = ""
@@ -12,46 +12,51 @@ struct RegistrationStep1: View {
     
     var body: some View {
         ZStack {
-            // Sfondo
+            // Background
             Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
             
-            VStack(spacing: 25) {
-                // Titolo
-                Text("Step 1/4")
-                    .font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray).padding(.top, 60)
-                Text("Chi sei?")
-                    .font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
-                
-                // Campi
-                VStack(spacing: 20) {
-                    CustomTextField(placeholder: "Nome", text: $name)
-                    CustomTextField(placeholder: "Cognome", text: $surname)
-                    CustomTextField(placeholder: "Email", text: $email)
-                    CustomTextField(placeholder: "Password", text: $password, isSecure: true)
+            // CONTENUTO RESO SCORREVOLE
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 25) {
+                    // Title
+                    Text("Step 1/4")
+                        .font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray).padding(.top, 60)
+                    Text("Who are you?")
+                        .font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
+                    
+                    // Fields
+                    VStack(spacing: 20) {
+                        CustomTextField(placeholder: "Name", text: $name)
+                        CustomTextField(placeholder: "Surname", text: $surname)
+                        CustomTextField(placeholder: "Email", text: $email)
+                        CustomTextField(placeholder: "Password", text: $password, isSecure: true)
+                    }
+                    
+                    Spacer()
+                    
+                    // "Continue" Button
+                    NavigationLink(destination: RegistrationStep2(isLoggedIn: $isLoggedIn)) {
+                        Text("Continue")
+                            .font(.system(.headline, design: .rounded).bold())
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(width: 140)
+                            .background(Color.appGreen)
+                            .cornerRadius(30)
+                            .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.bottom, 60)
                 }
-                
-                Spacer()
-                
-                // Bottone "Continua"
-                NavigationLink(destination: RegistrationStep2(isLoggedIn: $isLoggedIn)) {
-                    Text("Continua")
-                        .font(.system(.headline, design: .rounded).bold())
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 140)
-                        .background(Color.appGreen)
-                        .cornerRadius(30)
-                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
-                }
-                .padding(.bottom, 60)
+                .padding()
+                .frame(minHeight: UIScreen.main.bounds.height) // Forziamo l'altezza minima
             }
-            .padding()
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom) // IGNORA TASTIERA
         .navigationBarHidden(true)
     }
 }
 
-// --- STEP 2: DETTAGLI PERSONALI (FIX GENERE) ---
+// --- STEP 2: PERSONAL DETAILS (GENDER FIX) ---
 struct RegistrationStep2: View {
     @Binding var isLoggedIn: Bool
     @State private var bio = ""
@@ -65,116 +70,124 @@ struct RegistrationStep2: View {
         ZStack {
             Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
             
-            VStack(spacing: 25) {
-                // Header con tasto indietro custom
-                ZStack {
-                    HStack {
-                        Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                            Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen)
-                        }
-                        Spacer()
-                    }
-                    VStack {
-                        Text("Step 2/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
-                        Text("Parlaci di te").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
-                    }
-                }
-                .padding(.top, 60)
-                
-                // Campi
-                VStack(spacing: 20) {
-                    CustomTextField(placeholder: "Bio (es. Amo lo sport)", text: $bio)
-                    CustomTextField(placeholder: "Il tuo Motto", text: $motto)
-                    
-                    // --- FIX QUI SOTTO ---
-                    // Età e Genere sulla stessa riga
-                    HStack(spacing: 10) {
-                        // Picker Genere
-                        HStack(spacing: 5) {
-                            Text("Genere:")
-                                .font(.system(.caption, design: .rounded))
-                                .foregroundColor(.gray)
-                                .lineLimit(1) // Impedisce a capo
-                                .fixedSize()  // Forza la larghezza del testo
-                            
-                            Picker("", selection: $gender) {
-                                Text("Uomo").tag("Man")
-                                Text("Donna").tag("Woman")
+            // CONTENUTO RESO SCORREVOLE
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 25) {
+                    // Header with custom back button
+                    ZStack {
+                        HStack {
+                            Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                                Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen)
                             }
-                            .accentColor(.appGreen)
-                            .labelsHidden()
-                            .fixedSize() // *** FIX IMPORTANTE: Impedisce che "Uomo" vada a capo ***
+                            Spacer()
                         }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 15)
-                        .background(Color.white)
-                        .cornerRadius(30)
-                        
-                        Spacer()
-                        
-                        // Stepper Età
-                        HStack(spacing: 5) {
-                            Text("Età: \(age)")
-                                .font(.system(.caption, design: .rounded))
-                                .foregroundColor(.gray)
-                                .lineLimit(1)
-                                .fixedSize()
-                            
-                            Stepper("", value: $age, in: 18...99)
-                                .labelsHidden()
-                                .scaleEffect(0.9) // Rimpicciolisce leggermente lo stepper per farlo entrare meglio
+                        VStack {
+                            Text("Step 2/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                            Text("Tell us about you")
+                                .font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
                         }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 15)
-                        .background(Color.white)
-                        .cornerRadius(30)
                     }
-                    .padding(.horizontal, 10) // Padding esterno ridotto per dare più spazio
+                    .padding(.top, 60)
+                    
+                    // Fields
+                    VStack(spacing: 20) {
+                        CustomTextField(placeholder: "Bio (e.g. I love sports)", text: $bio)
+                        CustomTextField(placeholder: "Your Motto", text: $motto)
+                        
+                        // Age and Gender on the same row
+                        HStack(spacing: 10) {
+                            // Gender Picker
+                            HStack(spacing: 5) {
+                                Text("Gender:")
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                                    .fixedSize()
+                                
+                                Picker("", selection: $gender) {
+                                    Text("Man").tag("Man")
+                                    Text("Woman").tag("Woman")
+                                }
+                                .accentColor(.appGreen)
+                                .labelsHidden()
+                                .fixedSize() // FIX: Prevents text wrap
+                            }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 15)
+                            .background(Color.white)
+                            .cornerRadius(30)
+                            
+                            Spacer()
+                            
+                            // Age Stepper
+                            HStack(spacing: 5) {
+                                Text("Age: \(age)")
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                                    .fixedSize()
+                                
+                                Stepper("", value: $age, in: 18...99)
+                                    .labelsHidden()
+                                    .scaleEffect(0.9)
+                            }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 15)
+                            .background(Color.white)
+                            .cornerRadius(30)
+                        }
+                        .padding(.horizontal, 10)
+                    }
+                    
+                    Spacer()
+                    
+                    NavigationLink(destination: RegistrationStep3(isLoggedIn: $isLoggedIn)) {
+                        Text("Continue")
+                            .font(.system(.headline, design: .rounded).bold())
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(width: 140)
+                            .background(Color.appGreen)
+                            .cornerRadius(30)
+                            .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.bottom, 60)
                 }
-                
-                Spacer()
-                
-                NavigationLink(destination: RegistrationStep3(isLoggedIn: $isLoggedIn)) {
-                    Text("Continua")
-                        .font(.system(.headline, design: .rounded).bold())
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 140)
-                        .background(Color.appGreen)
-                        .cornerRadius(30)
-                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
-                }
-                .padding(.bottom, 60)
+                .padding()
+                .frame(minHeight: UIScreen.main.bounds.height) // Forziamo l'altezza minima
             }
-            .padding()
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom) // IGNORA TASTIERA
         .navigationBarHidden(true)
     }
 }
 
-// --- STEP 3: SPORT ---
+// --- STEP 3: SPORTS ---
 struct RegistrationStep3: View {
     @Binding var isLoggedIn: Bool
     @State private var selectedSports: Set<String> = []
     @Environment(\.presentationMode) var presentationMode
     
-    let sports = [("Nuoto", "figure.pool.swim"), ("Trekking", "figure.hiking"), ("Palestra", "dumbbell.fill"), ("Bici", "bicycle"), ("Tennis", "tennis.racket"), ("Volley", "figure.volleyball")]
+    let sports = [("Swimming", "figure.pool.swim"), ("Hiking", "figure.hiking"), ("Gym", "dumbbell.fill"), ("Cycling", "bicycle"), ("Tennis", "tennis.racket"), ("Volleyball", "figure.volleyball")]
     let columns = [GridItem(.adaptive(minimum: 100))]
     
     var body: some View {
         ZStack {
             Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
             
-            VStack(spacing: 25) {
-                ZStack {
-                    HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen) }; Spacer() }
-                    VStack {
-                        Text("Step 3/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
-                        Text("I tuoi Sport").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
-                    }
-                }.padding(.top, 60)
-                
-                ScrollView {
+            // CONTENUTO RESO SCORREVOLE
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 25) {
+                    ZStack {
+                        HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen) }; Spacer() }
+                        VStack {
+                            Text("Step 3/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                            Text("Your Sports")
+                                .font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
+                        }
+                    }.padding(.top, 60)
+                    
+                    // Contenuto Scrollable degli Sport
                     LazyVGrid(columns: columns, spacing: 15) {
                         ForEach(sports, id: \.0) { sport in
                             Button(action: {
@@ -193,29 +206,31 @@ struct RegistrationStep3: View {
                             }
                         }
                     }.padding()
+                    
+                    Spacer()
+                    
+                    NavigationLink(destination: RegistrationStep4(isLoggedIn: $isLoggedIn)) {
+                        Text("Continue")
+                            .font(.system(.headline, design: .rounded).bold())
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(width: 140)
+                            .background(Color.appGreen)
+                            .cornerRadius(30)
+                            .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.bottom, 60)
                 }
-                
-                Spacer()
-                
-                NavigationLink(destination: RegistrationStep4(isLoggedIn: $isLoggedIn)) {
-                    Text("Continua")
-                        .font(.system(.headline, design: .rounded).bold())
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 140)
-                        .background(Color.appGreen)
-                        .cornerRadius(30)
-                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
-                }
-                .padding(.bottom, 60)
+                .padding()
+                .frame(minHeight: UIScreen.main.bounds.height) // Forziamo l'altezza minima
             }
-            .padding()
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom) // IGNORA TASTIERA
         .navigationBarHidden(true)
     }
 }
 
-// --- STEP 4: PREFERENZE & FINE ---
+// --- STEP 4: PREFERENCES & END ---
 struct RegistrationStep4: View {
     @Binding var isLoggedIn: Bool
     @State private var sharePos = true
@@ -227,49 +242,55 @@ struct RegistrationStep4: View {
         ZStack {
             Image("app_foto").resizable().scaledToFill().edgesIgnoringSafeArea(.all).overlay(Color.white.opacity(0.92))
             
-            VStack(spacing: 25) {
-                ZStack {
-                    HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen) }; Spacer() }
-                    VStack {
-                        Text("Step 4/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
-                        Text("Preferenze").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
-                    }
-                }.padding(.top, 60)
-                
-                VStack(spacing: 20) {
-                    VStack(spacing: 15) {
-                        Toggle("Condividi Posizione", isOn: $sharePos)
-                        Toggle("Ricevi Notifiche", isOn: $notif)
-                    }
-                    .padding().background(Color.white).cornerRadius(20).toggleStyle(SwitchToggleStyle(tint: .appGreen))
+            // CONTENUTO RESO SCORREVOLE
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 25) {
+                    ZStack {
+                        HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.title2).foregroundColor(.appGreen) }; Spacer() }
+                        VStack {
+                            Text("Step 4/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                            Text("Preferences")
+                                .font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
+                        }
+                    }.padding(.top, 60)
                     
-                    VStack {
-                        Text("Distanza Max: \(Int(dist)) km").font(.caption).foregroundColor(.gray)
-                        Slider(value: $dist, in: 1...100, step: 1).accentColor(.appGreen)
+                    VStack(spacing: 20) {
+                        VStack(spacing: 15) {
+                            Toggle("Share Location", isOn: $sharePos)
+                            Toggle("Receive Notifications", isOn: $notif)
+                        }
+                        .padding().background(Color.white).cornerRadius(20).toggleStyle(SwitchToggleStyle(tint: .appGreen))
+                        
+                        VStack {
+                            Text("Max Distance: \(Int(dist)) km").font(.caption).foregroundColor(.gray)
+                            Slider(value: $dist, in: 1...100, step: 1).accentColor(.appGreen)
+                        }
+                        .padding().background(Color.white).cornerRadius(20)
                     }
-                    .padding().background(Color.white).cornerRadius(20)
+                    .padding(.horizontal)
+                    
+                    Spacer()
+                    
+                    // FINAL GO BUTTON
+                    Button(action: {
+                        withAnimation { isLoggedIn = true }
+                    }) {
+                        Text("Go!")
+                            .font(.system(.headline, design: .rounded).bold())
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(width: 140)
+                            .background(Color.appGreen)
+                            .cornerRadius(30)
+                            .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.bottom, 60)
                 }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // BOTTONE GO FINALE
-                Button(action: {
-                    withAnimation { isLoggedIn = true }
-                }) {
-                    Text("Go!")
-                        .font(.system(.headline, design: .rounded).bold())
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 140)
-                        .background(Color.appGreen)
-                        .cornerRadius(30)
-                        .shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
-                }
-                .padding(.bottom, 60)
+                .padding()
+                .frame(minHeight: UIScreen.main.bounds.height) // Forziamo l'altezza minima
             }
-            .padding()
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom) // IGNORA TASTIERA
         .navigationBarHidden(true)
     }
 }

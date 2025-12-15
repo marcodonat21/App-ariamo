@@ -1,15 +1,16 @@
 import SwiftUI
 import PhotosUI // NECESSARIO PER LA GALLERIA
 
-// --- SCHERMATA PROFILO PRINCIPALE ---
+// --- MAIN PROFILE SCREEN --- // Translated Comment
 struct ProfileScreen: View {
     
+    // Mock User Data // Translated Comment
     @State private var user = UserProfile(
         name: "Mario",
         surname: "Rossi",
         age: 25,
         gender: "Man",
-        bio: "Amo la corsa e la pizza!",
+        bio: "I love running and pizza!", // Translated
         motto: "Never give up",
         image: "person.crop.circle.fill",
         profileImageData: nil,
@@ -25,7 +26,7 @@ struct ProfileScreen: View {
         ScrollView {
             VStack(spacing: 30) {
                 
-                // HEADER PROFILO (Cliccabile)
+                // PROFILE HEADER (Clickable) // Translated Comment
                 NavigationLink(destination: EditProfileView(user: $user)) {
                     ProfileHeaderCard(user: user)
                 }
@@ -33,21 +34,21 @@ struct ProfileScreen: View {
                 
                 Divider()
                 
-                // MENU ATTIVITÀ
+                // ACTIVITIES MENU // Translated Comment
                 VStack(spacing: 15) {
                     NavigationLink(destination: CreatedActivitiesView()) {
-                        MenuRowItem(icon: "plus.circle.fill", title: "Attività Create", color: .appGreen)
+                        MenuRowItem(icon: "plus.circle.fill", title: "Created Activities", color: .appGreen) // Translated
                     }
                     
                     NavigationLink(destination: JoinedActivitiesView()) {
-                        MenuRowItem(icon: "figure.run.circle.fill", title: "Attività alle quali partecipi", color: .orange)
+                        MenuRowItem(icon: "figure.run.circle.fill", title: "Joined Activities", color: .orange) // Translated
                     }
                 }
                 .padding(.horizontal)
                 
-                // Anteprima Preferenze
+                // Preferences Preview // Translated Comment
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Le tue preferenze attuali")
+                    Text("Your current preferences") // Translated
                         .font(.caption)
                         .foregroundColor(.gray)
                         .padding(.horizontal)
@@ -65,11 +66,11 @@ struct ProfileScreen: View {
             .padding(.top)
             .padding(.bottom, 100)
         }
-        .navigationTitle("Profile")
+        .navigationTitle("Profile") // Translated
     }
 }
 
-// Badge Preferenze
+// Preference Badge
 struct PreferenceBadge: View {
     var icon: String? = nil
     var text: String? = nil
@@ -87,20 +88,20 @@ struct PreferenceBadge: View {
     }
 }
 
-// --- SCHERMATA MODIFICA (ALL-IN-ONE) ---
+// --- EDIT SCREEN (ALL-IN-ONE) --- // Translated Comment
 struct EditProfileView: View {
     @Binding var user: UserProfile
     @Environment(\.presentationMode) var presentationMode
     
-    // Stati per la gestione Foto
+    // Photo management states // Translated Comment
     @State private var showCamera = false
-    @State private var showGallery = false // NUOVO: Controlla apertura galleria
+    @State private var showGallery = false // NEW: Controls gallery opening // Translated Comment
     @State private var showActionSheet = false
     
-    @State private var selectedItem: PhotosPickerItem? = nil // Per la galleria
-    @State private var inputImage: UIImage? = nil // Immagine temporanea camera
+    @State private var selectedItem: PhotosPickerItem? = nil // For gallery
+    @State private var inputImage: UIImage? = nil // Temporary camera image
     
-    // Dati Sport
+    // Sports Data // Translated Comment
     let availableSports = [
         ("Swimming", "figure.pool.swim"), ("Hiking", "figure.hiking"),
         ("Gym", "dumbbell.fill"), ("Cycle", "bicycle"),
@@ -111,27 +112,27 @@ struct EditProfileView: View {
     
     var body: some View {
         Form {
-            // SEZIONE 0: FOTO PROFILO AVANZATA
-            Section(header: Text("Foto Profilo")) {
+            // SECTION 0: ADVANCED PROFILE PHOTO // Translated Comment
+            Section(header: Text("Profile Photo")) { // Translated
                 VStack(alignment: .center, spacing: 20) {
                     
-                    // FOTO ATTUALE (O Default)
+                    // CURRENT PHOTO (or Default) // Translated Comment
                     ZStack {
-                        // Sfondo Cerchio
+                        // Circle Background
                         Circle()
                             .fill(Color.appGreen.opacity(0.1))
                             .frame(width: 120, height: 120)
                         
-                        // LOGICA VISUALIZZAZIONE: Hai una foto reale?
+                        // VISUALIZATION LOGIC: Do you have a real photo? // Translated Comment
                         if let data = user.profileImageData, let uiImage = UIImage(data: data) {
-                            // SI: Mostra la foto reale
+                            // YES: Show real photo // Translated Comment
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 120, height: 120)
                                 .clipShape(Circle())
                         } else {
-                            // NO: Mostra l'icona di sistema
+                            // NO: Show system icon // Translated Comment
                             Image(systemName: user.image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
@@ -139,7 +140,7 @@ struct EditProfileView: View {
                                 .foregroundColor(.appGreen)
                         }
                         
-                        // Icona "Edit" sovrapposta
+                        // Overlay "Edit" Icon // Translated Comment
                         VStack {
                             Spacer()
                             HStack {
@@ -155,67 +156,69 @@ struct EditProfileView: View {
                         .frame(width: 120, height: 120)
                     }
                     .onTapGesture {
-                        showActionSheet = true // Apre il menu scelta
+                        showActionSheet = true // Open selection menu
                     }
                     
-                    Text("Tocca la foto per modificare")
+                    Text("Tap photo to edit") // Translated
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
             }
-            .confirmationDialog("Cambia foto profilo", isPresented: $showActionSheet) {
-                // OPZIONE 1: FOTOCAMERA
-                Button("Scatta una foto") {
+            .confirmationDialog("Change Profile Photo", isPresented: $showActionSheet) { // Translated
+                // OPTION 1: CAMERA
+                Button("Take a photo") { // Translated
                     showCamera = true
                 }
                 
-                // OPZIONE 2: GALLERIA (Ora nel menu!)
-                Button("Scegli dalla Galleria") {
+                // OPTION 2: GALLERY (Now in the menu!) // Translated
+                Button("Choose from Gallery") { // Translated
                     showGallery = true
                 }
                 
-                // OPZIONE 3: RIMUOVI FOTO
-                Button("Rimuovi foto attuale", role: .destructive) {
+                // OPTION 3: REMOVE PHOTO
+                Button("Remove current photo", role: .destructive) { // Translated
                     user.profileImageData = nil
                 }
                 
-                Button("Annulla", role: .cancel) { }
+                Button("Cancel", role: .cancel) { } // Translated
             } message: {
-                Text("Scegli come cambiare la tua immagine")
+                Text("Choose how to change your image") // Translated
             }
 
-            // SEZIONE 1: DATI PERSONALI
-            Section(header: Text("Anagrafica")) {
-                TextField("Nome", text: $user.name); TextField("Cognome", text: $user.surname)
-                Picker("Genere", selection: $user.gender) {
-                    Text("Uomo").tag("Man"); Text("Donna").tag("Woman"); Text("Altro").tag("Other")
+            // SECTION 1: PERSONAL DATA
+            Section(header: Text("Personal Data")) { // Translated
+                TextField("First Name", text: $user.name); TextField("Last Name", text: $user.surname) // Translated Placeholders
+                Picker("Gender", selection: $user.gender) { // Translated Label
+                    Text("Man").tag("Man"); Text("Woman").tag("Woman"); Text("Other").tag("Other") // Translated
                 }
-                Stepper("Età: \(user.age) anni", value: $user.age, in: 18...99)
+                Stepper("Age: \(user.age) years", value: $user.age, in: 18...99) // Translated
             }
             
-            // SEZIONE 2: INFO
-            Section(header: Text("Su di te")) { TextField("Bio", text: $user.bio); TextField("Motto", text: $user.motto) }
+            // SECTION 2: INFO
+            Section(header: Text("About you")) { // Translated
+                TextField("Bio", text: $user.bio); TextField("Motto", text: $user.motto) // Translated Placeholders
+            }
             
-            // SEZIONE 3: ACCOUNT
-            Section(header: Text("Credenziali")) {
+            // SECTION 3: ACCOUNT
+            Section(header: Text("Credentials")) { // Translated
                 TextField("Email", text: $user.email).keyboardType(.emailAddress).autocapitalization(.none)
-                SecureField("Password", text: $user.password)
+                SecureField("Password", text: $user.password) // Translated Placeholder
             }
             
-            // SEZIONE 4: PREFERENZE
-            Section(header: Text("Preferenze App")) {
-                Toggle("Condividi Posizione", isOn: $user.shareLocation).toggleStyle(SwitchToggleStyle(tint: .appGreen))
-                Toggle("Ricevi Notifiche", isOn: $user.notifications).toggleStyle(SwitchToggleStyle(tint: .appGreen))
+            // SECTION 4: PREFERENCES
+            Section(header: Text("App Preferences")) { // Translated
+                Toggle("Share Location", isOn: $user.shareLocation).toggleStyle(SwitchToggleStyle(tint: .appGreen)) // Translated
+                Toggle("Receive Notifications", isOn: $user.notifications).toggleStyle(SwitchToggleStyle(tint: .appGreen)) // Translated
                 VStack(alignment: .leading) {
-                    Text("Distanza Max: \(Int(user.maxDistance)) km")
+                    Text("Max Distance: \(Int(user.maxDistance)) km") // Translated
                     Slider(value: $user.maxDistance, in: 1...100, step: 1).accentColor(.appGreen)
                 }
             }
             
-            // SEZIONE 5: SPORT
-            Section(header: Text("I tuoi Sport")) {
+            // SECTION 5: SPORTS
+            Section(header: Text("Your Sports")) { // Translated
                 LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(availableSports, id: \.0) { sport in
                         Button(action: {
@@ -235,34 +238,34 @@ struct EditProfileView: View {
                 }
             }
             
-            // SALVA
-            Section {
+            // SAVE
+            Section { // Translated
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Text("Salva Modifiche").bold().frame(maxWidth: .infinity).foregroundColor(.white).padding(10).background(Color.appGreen).cornerRadius(8)
+                    Text("Save Changes").bold().frame(maxWidth: .infinity).foregroundColor(.white).padding(10).background(Color.appGreen).cornerRadius(8) // Translated
                 }
                 .listRowBackground(Color.clear)
             }
         }
-        .navigationTitle("Modifica Profilo")
+        .navigationTitle("Edit Profile") // Translated
         
-        // --- SHEET FOTOCAMERA ---
+        // --- CAMERA SHEET --- // Translated Comment
         .sheet(isPresented: $showCamera) {
             CameraPicker(selectedImage: $inputImage)
         }
         
-        // --- PICKER GALLERIA (Attivato dal menu) ---
+        // --- GALLERY PICKER (Activated by menu) --- // Translated Comment
         .photosPicker(isPresented: $showGallery, selection: $selectedItem, matching: .images)
         
-        // LOGICA DI SALVATAGGIO IMMAGINI
+        // IMAGE SAVING LOGIC // Translated Comment
         
-        // 1. Dalla Fotocamera
-        .onChange(of: inputImage) { newImage in
+        // 1. From Camera
+        .onChange(of: inputImage) { newImage in // Translated Comment
             if let newImage = newImage, let data = newImage.jpegData(compressionQuality: 0.8) {
                 user.profileImageData = data
             }
         }
-        // 2. Dalla Galleria
-        .onChange(of: selectedItem) { newItem in
+        // 2. From Gallery
+        .onChange(of: selectedItem) { newItem in // Translated Comment
             Task {
                 if let data = try? await newItem?.loadTransferable(type: Data.self) {
                     user.profileImageData = data
@@ -272,12 +275,12 @@ struct EditProfileView: View {
     }
 }
 
-// --- COMPONENTI UI RIUTILIZZATI ---
+// --- REUSED UI COMPONENTS --- // Translated Comment
 struct ProfileHeaderCard: View {
     let user: UserProfile
     var body: some View {
         HStack(spacing: 20) {
-            // LOGICA VISUALIZZAZIONE FOTO NELL'HEADER
+            // PHOTO VISUALIZATION LOGIC IN HEADER // Translated Comment
             if let data = user.profileImageData, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -298,8 +301,8 @@ struct ProfileHeaderCard: View {
             
             VStack(alignment: .leading, spacing: 5) {
                 Text("\(user.name) \(user.surname)").font(.title2).bold().foregroundColor(.white)
-                Text("\(user.age) anni").font(.headline).foregroundColor(.white.opacity(0.9))
-                HStack { Text("Clicca per modificare"); Image(systemName: "pencil") }
+                Text("\(user.age) years").font(.headline).foregroundColor(.white.opacity(0.9)) // Translated
+                HStack { Text("Tap to edit"); Image(systemName: "pencil") } // Translated
                     .font(.caption).foregroundColor(.white).padding(.top, 5)
             }
             Spacer()
@@ -328,8 +331,8 @@ struct MenuRowItem: View {
     }
 }
 
-struct CreatedActivitiesView: View { var body: some View { Text("Attività create dall'utente") } }
-struct JoinedActivitiesView: View { var body: some View { Text("Attività a cui partecipa l'utente") } }
+struct CreatedActivitiesView: View { var body: some View { Text("User created activities") } } // Translated
+struct JoinedActivitiesView: View { var body: some View { Text("User joined activities") } } // Translated
 
 // --- PREVIEW ---
 struct ProfileFlow_Previews: PreviewProvider {

@@ -1,18 +1,18 @@
 import SwiftUI
 
-// --- WIZARD CREAZIONE & RIEPILOGO ---
+// --- CREATION WIZARD & SUMMARY --- // Translated Comment
 
 struct CreationWizardView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var step = 1
     
-    // Stato per contenere i dati che l'utente sta inserendo (DatiEvento da AppConstants)
+    // State to hold the data the user is entering (DatiEvento from AppConstants) // Translated Comment
     @State private var nuovoEvento = DatiEvento()
     
     var body: some View {
         VStack {
-            // Header Navigazione
-            HStack {
+            // Navigation Header
+            HStack { // Translated Comment
                 if step > 1 && step < 4 {
                     Button(action: { withAnimation { step -= 1 } }) {
                         Image(systemName: "chevron.left")
@@ -21,7 +21,7 @@ struct CreationWizardView: View {
                     }
                 }
                 Spacer()
-                // Il tasto chiudi è sempre disponibile
+                // The close button is always available // Translated Comment
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark")
                         .font(.title2)
@@ -32,18 +32,18 @@ struct CreationWizardView: View {
             
             Spacer()
             
-            // Contenuto dinamico in base allo step
+            // Dynamic content based on the step // Translated Comment
             Group {
                 if step == 1 {
-                    Step1View(dati: $nuovoEvento, nextAction: nextStep)
+                    Step1View(data: $nuovoEvento, nextAction: nextStep)
                 } else if step == 2 {
-                    Step2View(dati: $nuovoEvento, nextAction: nextStep)
+                    Step2View(data: $nuovoEvento, nextAction: nextStep)
                 } else if step == 3 {
-                    Step3View(dati: $nuovoEvento, nextAction: nextStep)
+                    Step3View(data: $nuovoEvento, nextAction: nextStep)
                 } else {
-                    // STEP 4: Riepilogo Finale
-                    RiepilogoEventoView(
-                        evento: nuovoEvento,
+                    // STEP 4: Final Summary // Translated Comment
+                    EventSummaryView( // Translated View Name
+                        event: nuovoEvento,
                         closeAction: { presentationMode.wrappedValue.dismiss() }
                     )
                 }
@@ -60,11 +60,11 @@ struct CreationWizardView: View {
     }
 }
 
-// Step 1: Quale attività?
+// Step 1: What activity? // Translated Comment
 struct Step1View: View {
-    @Binding var dati: DatiEvento
+    @Binding var data: DatiEvento
     var nextAction: () -> Void
-    let options = ["Sport", "Travel & Adventure", "Party", "Holiday"]
+    let options = ["Sports", "Travel & Adventure", "Party", "Holiday"] // Translated Options
     
     var body: some View {
         VStack(spacing: 20) {
@@ -72,7 +72,7 @@ struct Step1View: View {
                 .font(.system(size: 40))
                 .foregroundColor(.appGreen)
             
-            Text("Quale attività\nvuoi apparare?")
+            Text("Which activity\ndo you want to join?") // Translated
                 .font(.title2)
                 .bold()
                 .multilineTextAlignment(.center)
@@ -80,7 +80,7 @@ struct Step1View: View {
             
             ForEach(options, id: \.self) { option in
                 Button(action: {
-                    dati.tipo = option
+                    data.tipo = option
                     nextAction()
                 }) {
                     Text(option)
@@ -97,24 +97,24 @@ struct Step1View: View {
     }
 }
 
-// Step 2: Quando?
+// Step 2: When? // Translated Comment
 struct Step2View: View {
-    @Binding var dati: DatiEvento
+    @Binding var data: DatiEvento
     var nextAction: () -> Void
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Quando vi apparate?")
+            Text("When are you joining?") // Translated
                 .font(.title2)
                 .bold()
                 .foregroundColor(.appGreen)
             
-            DatePicker("", selection: $dati.data, displayedComponents: [.date, .hourAndMinute])
+            DatePicker("", selection: $data.data, displayedComponents: [.date, .hourAndMinute])
                 .datePickerStyle(WheelDatePickerStyle())
                 .labelsHidden()
             
             Button(action: nextAction) {
-                Text("Avanti")
+                Text("Next") // Translated
                     .foregroundColor(.white)
                     .padding()
                     .frame(width: 200)
@@ -125,51 +125,51 @@ struct Step2View: View {
     }
 }
 
-// Step 3: Dove?
+// Step 3: Where? // Translated Comment
 struct Step3View: View {
-    @Binding var dati: DatiEvento
+    @Binding var data: DatiEvento
     var nextAction: () -> Void
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Dove vi apparate?")
+            Text("Where are you joining?") // Translated
                 .font(.title2)
                 .bold()
                 .foregroundColor(.appGreen)
             
-            TextField("Inserisci luogo...", text: $dati.luogo)
+            TextField("Enter location...", text: $data.luogo) // Translated Placeholder
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .padding(.horizontal, 40)
             
             Button(action: nextAction) {
-                Text("Crea Evento")
+                Text("Create Event") // Translated
                     .bold()
                     .foregroundColor(.white)
                     .padding()
                     .frame(width: 200)
-                    .background(dati.luogo.isEmpty ? Color.gray : Color.appGreen)
+                    .background(data.luogo.isEmpty ? Color.gray : Color.appGreen)
                     .cornerRadius(25)
             }
-            .disabled(dati.luogo.isEmpty)
+            .disabled(data.luogo.isEmpty)
         }
     }
 }
 
-// STEP 4: Schermata di Dettaglio finale
-struct RiepilogoEventoView: View {
-    let evento: DatiEvento
+// STEP 4: Final Summary Screen // Translated Comment
+struct EventSummaryView: View { // Translated View Name
+    let event: DatiEvento
     var closeAction: () -> Void
     
     var body: some View {
         VStack(spacing: 25) {
             
-            // Icona Successo
-            Image(systemName: "checkmark.seal.fill")
+            // Success Icon
+            Image(systemName: "checkmark.seal.fill") // Translated Comment
                 .font(.system(size: 60))
                 .foregroundColor(.appGreen)
                 .padding(.bottom, 10)
             
-            Text("Congratulazioni!\nHai apparato!")
+            Text("Congratulations!\nYou've created an event!") // Translated
                 .font(.title)
                 .bold()
                 .multilineTextAlignment(.center)
@@ -177,18 +177,18 @@ struct RiepilogoEventoView: View {
             
             Divider().padding(.horizontal)
             
-            // Card Riepilogo Dati
+            // Data Summary Card // Translated Comment
             VStack(alignment: .leading, spacing: 15) {
-                Text("DETTAGLI EVENTO")
+                Text("EVENT DETAILS") // Translated
                     .font(.caption)
                     .bold()
                     .foregroundColor(.gray)
-                    
+                
                 HStack {
                     Image(systemName: "tag.fill")
                         .foregroundColor(.appGreen)
                         .frame(width: 30)
-                    Text(evento.tipo)
+                    Text(event.tipo)
                         .font(.title3)
                         .bold()
                 }
@@ -197,8 +197,8 @@ struct RiepilogoEventoView: View {
                     Image(systemName: "calendar")
                         .foregroundColor(.appGreen)
                         .frame(width: 30)
-                    // Formattazione data semplice
-                    Text(evento.data.formatted(date: .long, time: .shortened))
+                    // Simple date formatting // Translated Comment
+                    Text(event.data.formatted(date: .long, time: .shortened))
                         .font(.body)
                 }
                 
@@ -206,7 +206,7 @@ struct RiepilogoEventoView: View {
                     Image(systemName: "mappin.and.ellipse")
                         .foregroundColor(.appGreen)
                         .frame(width: 30)
-                    Text(evento.luogo)
+                    Text(event.luogo)
                         .font(.body)
                 }
             }
@@ -218,7 +218,7 @@ struct RiepilogoEventoView: View {
             Spacer().frame(height: 20)
             
             Button(action: closeAction) {
-                Text("Torna alla Home")
+                Text("Back to Home") // Translated
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding()

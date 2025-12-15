@@ -14,7 +14,7 @@ struct ContentView: View {
                 ZStack(alignment: .topTrailing) {
                     switch selectedTab {
                     case .home:
-                        // *** MODIFICA QUI: Passiamo isSearchActive ***
+                        // *** MODIFIED HERE: We pass isSearchActive *** // Translated Comment
                         MapScreen(searchText: $searchText, isSearchActive: $isSearchActive)
                     case .activities:
                         ActivityListScreen().navigationBarHidden(true)
@@ -24,7 +24,8 @@ struct ContentView: View {
                         EmptyView()
                     }
                     
-                    if !isSearchActive && selectedTab == .home {
+                    // PLUS BUTTON (only visible on Home and if search is not active)
+                    if !isSearchActive && selectedTab == .home { // Translated Comment
                         Button(action: { showCreationWizard = true }) {
                             Image(systemName: "plus")
                                 .font(.title3.weight(.bold))
@@ -47,11 +48,11 @@ struct ContentView: View {
             VStack(spacing: 15) {
                 Spacer()
                 
-                // BARRA RICERCA
-                if isSearchActive {
+                // SEARCH BAR
+                if isSearchActive { // Translated Comment
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundColor(.white.opacity(0.7))
-                        TextField("Cerca...", text: $searchText)
+                        TextField("Search...", text: $searchText) // Translated Placeholder
                             .foregroundColor(.white)
                             .accentColor(.white)
                             .focused($isFocused)
@@ -72,14 +73,14 @@ struct ContentView: View {
                     .zIndex(2)
                 }
                 
-                // BARRA TAB
-                HStack(spacing: 20) {
+                // TAB BAR
+                HStack(spacing: 20) { // Translated Comment
                     HStack {
-                        CustomTabItem(icon: "house.fill", title: "Home", tab: .home, selected: $selectedTab)
+                        CustomTabItem(icon: "house.fill", title: "Home", tab: .home, selected: $selectedTab) // Tab Title in English
                         Spacer()
-                        CustomTabItem(icon: "list.bullet.rectangle.portrait.fill", title: "Activities", tab: .activities, selected: $selectedTab)
+                        CustomTabItem(icon: "list.bullet.rectangle.portrait.fill", title: "Activities", tab: .activities, selected: $selectedTab) // Tab Title in English
                         Spacer()
-                        CustomTabItem(icon: "person.crop.circle.fill", title: "Profile", tab: .profile, selected: $selectedTab)
+                        CustomTabItem(icon: "person.crop.circle.fill", title: "Profile", tab: .profile, selected: $selectedTab) // Tab Title in English
                     }
                     .padding(.horizontal, 30)
                     .padding(.vertical, 15)
@@ -129,7 +130,7 @@ struct ContentView: View {
     }
 }
 
-// CustomTabItem (Resta uguale)
+// CustomTabItem (Stays the same) // Translated Comment
 struct CustomTabItem: View {
     let icon: String; let title: String; let tab: Tab; @Binding var selected: Tab
     var isSelected: Bool { selected == tab }
