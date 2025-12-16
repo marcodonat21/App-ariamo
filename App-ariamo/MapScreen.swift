@@ -2,138 +2,171 @@ import SwiftUI
 import MapKit
 
 struct MapLocation: Identifiable {
-    let id = UUID()
-    let name: String
-    let coordinate: CLLocationCoordinate2D
-    let imageName: String
-    let description: String
+    let id: UUID; let name: String; let coordinate: CLLocationCoordinate2D; let imageName: String; let description: String; let imageData: Data?
 }
 
 struct MapScreen: View {
     @Binding var searchText: String
     @Binding var isSearchActive: Bool
+    @ObservedObject var manager = ActivityManager.shared
+    @ObservedObject var userManager = UserManager.shared
     
+    @StateObject private var filters = FilterSettings()
+    @State private var showFilters = false
     @State private var selectedLocation: MapLocation? = nil
     @State private var navigateToDetail = false
+    @State private var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 40.8518, longitude: 14.2681), span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
     
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 40.8518, longitude: 14.2681),
-        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-    )
+    var filteredLocations: [MapLocation] {
+        let allActs = ActivityManager.defaultActivities + manager.createdActivities
+        let filteredActs = filters.apply(to: allActs)
+        var locations = filteredActs.map { act in
+            MapLocation(id: act.id, name: act.title, coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude), imageName: act.imageName, description: act.description, imageData: act.imageData)
+        }
+        if !searchText.isEmpty { locations = locations.filter { $0.name.localizedCaseInsensitiveContains(searchText) } }
+        return locations
+    }
     
-    let allLocations = [
-        MapLocation(name: "Da Michele Pizzeria", coordinate: CLLocationCoordinate2D(latitude: 40.8498, longitude: 14.2633), imageName: "fork.knife", description: "Naples' most famous pizza."),
-        MapLocation(name: "Maradona Stadium", coordinate: CLLocationCoordinate2D(latitude: 40.8279, longitude: 14.1930), imageName: "figure.soccer", description: "The temple of football."),
-        MapLocation(name: "Waterfront", coordinate: CLLocationCoordinate2D(latitude: 40.8322, longitude: 14.2426), imageName: "sun.max.fill", description: "Walk with a view of Vesuvius.")
-    ]
+    var liveSelectedLocation: MapLocation? {
+        guard let current = selectedLocation else { return nil }
+        let liveActivity = manager.createdActivities.first(where: { $0.id == current.id })
+            ?? manager.joinedActivities.first(where: { $0.id == current.id })
+            ?? ActivityManager.defaultActivities.first(where: { $0.id == current.id })
+        
+        if let act = liveActivity {
+            return MapLocation(id: act.id, name: act.title, coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude), imageName: act.imageName, description: act.description, imageData: act.imageData)
+        }
+        return current
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
+            Color.clear.contentShape(Rectangle()).onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil); withAnimation { selectedLocation = nil } }
             
-            // 1. MAP LAYER (Sfondo)
-            // Usa GeometryReader o ZStack standard ignorando safe area per la mappa
-            Map(coordinateRegion: $region, annotationItems: filteredLocations) { location in
-                MapAnnotation(coordinate: location.coordinate) {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            endEditing() // Chiudi tastiera se aperta
-                            isSearchActive = false
-                            selectedLocation = location
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            ZStack {
-                                Circle().fill(selectedLocation?.id == location.id ? Color.appGreen : Color.red).frame(width: 40, height: 40).shadow(radius: 4).overlay(Circle().stroke(Color.white, lineWidth: 2))
-                                Image(systemName: "mappin").foregroundColor(.white).font(.headline)
-                            }
-                            Text(location.name).font(.caption).bold().foregroundColor(.black).padding(.horizontal, 4).background(Color.white.opacity(0.7)).cornerRadius(4)
-                        }
-                        .scaleEffect(selectedLocation?.id == location.id ? 1.2 : 1.0)
-                    }
-                }
-            }
-            .ignoresSafeArea(.all) // La mappa copre tutto
-            .onTapGesture {
-                // TAP SULLA MAPPA: Chiudi tutto
-                withAnimation {
-                    selectedLocation = nil
-                    endEditing() // CHIUDE LA TASTIERA
-                }
-            }
-            
-            // 2. SEARCH BAR LAYER (Sopra la mappa)
-            // NON usiamo .ignoresSafeArea(.keyboard) qui, così viene spinto su!
-            VStack {
-                Spacer() // Spinge la barra in basso
+            Map(coordinateRegion: $region, annotationItems: filteredLocations + [
+                MapLocation(id: UUID(), name: "ME", coordinate: ActivityManager.userLocation.coordinate, imageName: "person.fill", description: "", imageData: nil)
+            ]) { location in
                 
-                if isSearchActive {
-                    HStack {
-                        Image(systemName: "magnifyingglass").foregroundColor(.white.opacity(0.7))
-                        TextField("Search...", text: $searchText)
-                            .foregroundColor(.white)
-                            .accentColor(.white)
-                            .submitLabel(.search)
-                        if !searchText.isEmpty {
-                            Button(action: { searchText = "" }) { Image(systemName: "xmark.circle.fill").foregroundColor(.white.opacity(0.7)) }
+                MapAnnotation(coordinate: location.coordinate) {
+                    if location.name == "ME" {
+                        ZStack {
+                            if filters.enableDistanceFilter {
+                                GeometryReader { geo in
+                                    let pixelRadius = (filters.maxDistanceKm / 111.0) * (UIScreen.main.bounds.height / region.span.latitudeDelta)
+                                    ZStack {
+                                        Circle().fill(Color.blue.opacity(0.15)).frame(width: pixelRadius * 2, height: pixelRadius * 2)
+                                        Circle().stroke(Color.blue.opacity(0.4), lineWidth: 1).frame(width: pixelRadius * 2, height: pixelRadius * 2)
+                                    }.position(x: 0, y: 0)
+                                }.frame(width: 0, height: 0)
+                            }
+                            Circle().fill(Color.white).frame(width: 20, height: 20).shadow(radius: 3)
+                            Circle().fill(Color.blue).frame(width: 14, height: 14)
+                        }
+                    } else {
+                        MapPinView(location: location, manager: manager, selectedLocation: selectedLocation) {
+                            withAnimation(.spring()) {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                isSearchActive = false
+                                selectedLocation = location
+                            }
                         }
                     }
-                    .padding()
-                    .background(Color.black.opacity(0.6)) // Sfondo scuro per contrasto
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .padding(.horizontal, 25)
-                    .padding(.bottom, 10) // Un po' di margine dal bordo (o tastiera)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            // Importante: Questo VStack rispetterà la tastiera e salirà
+            .ignoresSafeArea(.all)
+            .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil); withAnimation { selectedLocation = nil } }
             
-            // 3. NAVIGATION LINK INVISIBILE
-            NavigationLink(isActive: $navigateToDetail) {
-                if let loc = selectedLocation {
-                    // CONVERSIONE: Da MapLocation a Activity per la view dettagliata
-                    let activityFromMap = Activity(
-                        title: loc.name,
-                        imageName: loc.imageName,
-                        color: .appGreen, // Default color
-                        description: loc.description
-                    )
-                    ActivityDetailView(activity: activityFromMap)
+            VStack {
+                HStack {
+                    Button(action: { showFilters = true }) {
+                        Image(systemName: "slider.horizontal.3").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(14).background(Color.themeCard).clipShape(Circle()).shadow(color: .appGreen.opacity(0.4), radius: 8, x: 0, y: 4).overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                    }.padding(.top, 50).padding(.leading, 20)
+                    Spacer()
                 }
-            } label: { EmptyView() }
-
-            // 4. PREVIEW CARD
-            if let location = selectedLocation {
-                ZStack(alignment: .topTrailing) {
-                    HStack(alignment: .center, spacing: 15) {
-                        ZStack {
-                            Circle().fill(Color.appGreen.opacity(0.15)).frame(width: 60, height: 60)
-                            Image(systemName: location.imageName).font(.title).foregroundColor(.appGreen)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(location.name).font(.headline).foregroundColor(.black)
-                            Text(location.description).font(.subheadline).foregroundColor(.gray).lineLimit(1)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundColor(.gray.opacity(0.5)).padding(.trailing, 20)
-                    }
-                    .padding(20).background(Color.white).cornerRadius(25).shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 5)
-                    .onTapGesture { navigateToDetail = true }
-                    
-                    Button(action: { withAnimation { selectedLocation = nil } }) {
-                        Image(systemName: "xmark.circle.fill").font(.title2).foregroundColor(.gray.opacity(0.4)).padding(10)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 120)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                Spacer()
+            }
+            
+            if let liveLoc = liveSelectedLocation {
+                MapLocationCard(location: liveLoc) { navigateToDetail = true } onClose: { withAnimation { selectedLocation = nil } }.zIndex(2)
             }
         }
+        .background(NavigationLink(destination: destinationView, isActive: $navigateToDetail) { EmptyView() })
         .navigationBarHidden(true)
-        .onChange(of: isSearchActive) { isActive in if isActive { withAnimation { selectedLocation = nil } } }
+        .sheet(isPresented: $showFilters) { FilterSheetView(filters: filters, showSortOptions: false) }
     }
     
-    var filteredLocations: [MapLocation] {
-        if searchText.isEmpty { return allLocations }
-        else { return allLocations.filter { $0.name.localizedCaseInsensitiveContains(searchText) } }
+    var destinationView: some View {
+        if let loc = liveSelectedLocation {
+            let originalActivity = ActivityManager.defaultActivities.first(where: { $0.id == loc.id }) ?? manager.createdActivities.first(where: { $0.id == loc.id }) ?? manager.joinedActivities.first(where: { $0.id == loc.id })
+            let activity = Activity(id: loc.id, title: loc.name, category: originalActivity?.category ?? "General", imageName: loc.imageName, imageData: loc.imageData, color: .appGreen, description: loc.description, date: originalActivity?.date ?? Date(), locationName: originalActivity?.locationName ?? "Naples, IT", lat: loc.coordinate.latitude, lon: loc.coordinate.longitude)
+            return AnyView(ActivityDetailView(activity: activity))
+        } else { return AnyView(EmptyView()) }
     }
 }
+
+// --- MAP PIN VIEW AGGIORNATO CON CUORE ---
+struct MapPinView: View {
+    let location: MapLocation
+    @ObservedObject var manager: ActivityManager
+    let selectedLocation: MapLocation?
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 4) {
+                ZStack {
+                    let isJoined = manager.joinedActivities.contains(where: { $0.id == location.id })
+                    let isCreatedByMe = manager.createdActivities.contains(where: { $0.id == location.id })
+                    // CHECK PREFERITI
+                    let isFavorite = manager.favoriteActivities.contains(location.id)
+                    
+                    // Cerchio principale
+                    Circle()
+                        .fill(isJoined ? Color.appGreen : Color.red)
+                        .frame(width: 40, height: 40)
+                        .shadow(radius: 4)
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    
+                    Image(systemName: "mappin")
+                        .foregroundColor(.white)
+                        .font(.headline)
+                    
+                    // STELLA (Creatore) - Alto Destra
+                    if isCreatedByMe {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.yellow)
+                            .font(.caption)
+                            .padding(3)
+                            .background(Circle().fill(Color.white))
+                            .offset(x: 14, y: -14)
+                    }
+                    
+                    // CUORE (Preferito) - Alto Sinistra
+                    if isFavorite {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(3)
+                            .background(Circle().fill(Color.white))
+                            .offset(x: -14, y: -14)
+                    }
+                }
+                
+                // Nome
+                Text(location.name)
+                    .font(.caption)
+                    .bold()
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.8))
+                    .cornerRadius(4)
+            }
+            .scaleEffect(selectedLocation?.id == location.id ? 1.2 : 1.0)
+            .animation(.spring(), value: selectedLocation?.id)
+        }
+    }
+}
+
+// MapLocationCard rimane uguale
+struct MapLocationCard: View { let location: MapLocation; let onTap: () -> Void; let onClose: () -> Void; var body: some View { ZStack(alignment: .topTrailing) { HStack(alignment: .center, spacing: 15) { if let data = location.imageData, let uiImage = UIImage(data: data) { Image(uiImage: uiImage).resizable().scaledToFill().frame(width: 60, height: 60).clipShape(Circle()).overlay(Circle().stroke(Color.appGreen, lineWidth: 2)) } else { ZStack { Circle().fill(Color.appGreen.opacity(0.15)).frame(width: 60, height: 60); Image(systemName: location.imageName).font(.title).foregroundColor(.appGreen) } }; VStack(alignment: .leading, spacing: 4) { Text(location.name).font(.headline).foregroundColor(.primary); Text(location.description).font(.subheadline).foregroundColor(.secondary).lineLimit(1) }; Spacer(); Image(systemName: "chevron.right").foregroundColor(.gray.opacity(0.5)).padding(.trailing, 20) }.padding(20).background(Color.themeCard).cornerRadius(25).shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 5).onTapGesture(perform: onTap); Button(action: onClose) { Image(systemName: "xmark.circle.fill").font(.title2).foregroundColor(.gray.opacity(0.4)).padding(10) } }.padding(.horizontal, 20).padding(.bottom, 120).transition(.move(edge: .bottom).combined(with: .opacity)) } }

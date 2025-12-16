@@ -1,79 +1,94 @@
 import SwiftUI
 
 struct ActivityListScreen: View {
-    // Uses the global Activity definition (assuming it's defined in AppConstants.swift)
-    let activities = [
-        // Order MUST be: (title, imageName, color, description)
-        Activity(title: "Sports", imageName: "figure.run", color: .red, description: "Group events focused on physical activity."),
-        Activity(title: "Travel & Adventure", imageName: "airplane", color: .orange, description: "Trips, excursions, and new discoveries."),
-        Activity(title: "Party & Fun", imageName: "party.popper.fill", color: .yellow, description: "Nights out and social gatherings."),
-        Activity(title: "Studying & Learning", imageName: "book.fill", color: .appGreen, description: "Study sessions and cultural events.")
+    // Definizione delle categorie
+    let categories = [
+        ("Sports", "figure.run", Color.blue),
+        ("Food", "fork.knife", Color.orange),
+        ("Travel & Adventure", "airplane", Color.yellow),
+        ("Party", "balloon.2.fill", Color.purple),
+        ("Holiday", "sun.max.fill", Color.pink),
+        ("Culture", "building.columns.fill", Color.red)
     ]
-
+    
+    let columns = [GridItem(.adaptive(minimum: 160), spacing: 20)]
+    
+    // --- STATI NECESSARI PER IL FIX ---
+    // ActivityCategoryView ora richiede questi due parametri
+    @State private var searchText = ""
+    @State private var isSearchActive = false
+    
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // SECTION TITLE
-                Text("Find an activity type")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.appGreen)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top)
-
-                ForEach(activities) { activity in
-                    // NavigationLink added to make the card clickable
-                    NavigationLink(destination: Text("Detail screen for \(activity.title)")) {
-                         ActivityCard(activity: activity)
+        NavigationView {
+            ZStack {
+                Color.themeBackground.ignoresSafeArea() // Sfondo Dark Mode compatibile
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        
+                        // Titolo
+                        Text("Explore Categories")
+                            .font(.system(.largeTitle, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundColor(.themeText)
+                            .padding(.top, 20)
+                        
+                        // Griglia Categorie
+                        LazyVGrid(columns: columns, spacing: 20) {
+                            ForEach(categories, id: \.0) { category in
+                                NavigationLink(destination: ActivityCategoryView(
+                                    category: category.0,
+                                    searchText: $searchText,       // <--- FIX: Passiamo la variabile
+                                    isSearchActive: $isSearchActive // <--- FIX: Passiamo la variabile
+                                )) {
+                                    CategoryCard(title: category.0, icon: category.1, color: category.2)
+                                }
+                            }
+                        }
                     }
-                    .buttonStyle(PlainButtonStyle()) // Removes the default NavigationLink effect
+                    .padding(.horizontal, 25)
+                    .padding(.bottom, 100) // Spazio per la TabBar
                 }
             }
-            .padding()
-            .padding(.bottom, 90) // EXTRA PADDING for custom tab bar
+            .navigationBarHidden(true)
         }
-        .navigationTitle("Activities")
-        .navigationBarTitleDisplayMode(.large)
     }
 }
 
-// ActivityCard
-struct ActivityCard: View {
-    let activity: Activity
+// Card Grafica per la Categoria
+struct CategoryCard: View {
+    let title: String
+    let icon: String
+    let color: Color
+    
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // 1. MAIN BACKGROUND COLOR
-            Rectangle()
-                .fill(activity.color)
-                .frame(height: 180) // Fixed height
-                .cornerRadius(25)
-            
-            // 2. LARGE SEMI-TRANSPARENT ICON (overlay on the entire card)
-            Image(systemName: activity.imageName)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 120, height: 120) // Larger icon to fill
-                .foregroundColor(.white.opacity(0.3)) // Semi-transparent icon
-                .offset(x: 100, y: -20)
-                .rotationEffect(.degrees(-15)) // A bit of style
-            
-            // 3. TEXT CONTENT (Bottom Left)
-            VStack(alignment: .leading, spacing: 5) {
-                // Title
-                Text(activity.title)
-                    .fontWeight(.heavy)
-                    .foregroundStyle(.white)
-                    .font(.title)
-                
-                // Description
-                Text(activity.description)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(2)
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.2))
+                    .frame(width: 50, height: 50)
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
             }
-            .padding([.leading, .bottom], 25)
+            
+            Text(title)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.themeText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
         }
-        .frame(maxWidth: .infinity)
-        .shadow(color: activity.color.opacity(0.3), radius: 10, x: 0, y: 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.themeCard) // Card colore adattivo
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct ActivityListScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        ActivityListScreen()
     }
 }

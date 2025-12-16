@@ -1,31 +1,59 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Binding var isLoggedIn: Bool
+    
     @State private var showCreationWizard = false
-    @State private var selectedTab: Tab = .home
+    @State private var selectedTab: AppTab = .home
     @State private var isSearchActive = false
     @State private var searchText = ""
     @FocusState private var isFocused: Bool
+    
+    // ID per il reset delle pagine
+    @State private var homeID = UUID()
+    @State private var activitiesID = UUID()
+    @State private var profileID = UUID()
 
     var body: some View {
         ZStack(alignment: .bottom) {
             
+            // 1. LIVELLO MAPPA/CONTENUTO
             NavigationView {
                 ZStack(alignment: .topTrailing) {
-                    switch selectedTab {
-                    case .home:
-                        // *** MODIFIED HERE: We pass isSearchActive *** // Translated Comment
-                        MapScreen(searchText: $searchText, isSearchActive: $isSearchActive)
-                    case .activities:
-                        ActivityListScreen().navigationBarHidden(true)
-                    case .profile:
-                        ProfileScreen().navigationBarHidden(true)
-                    case .search:
-                        EmptyView()
+                    
+                    // GESTORE CHIUSURA TASTIERA GLOBALE
+                    // Questo sfondo invisibile cattura i tap quando la tastiera è aperta
+                    if isFocused || isSearchActive {
+                        Color.black.opacity(0.001) // Quasi invisibile ma interattivo
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                hideKeyboard()
+                                isFocused = false
+                            }
+                            .zIndex(1) // Stare sopra al contenuto ma sotto alla UI
                     }
                     
-                    // PLUS BUTTON (only visible on Home and if search is not active)
-                    if !isSearchActive && selectedTab == .home { // Translated Comment
+                    Group {
+                        switch selectedTab {
+                        case .home:
+                            MapScreen(searchText: $searchText, isSearchActive: $isSearchActive)
+                                .id(homeID)
+                        case .activities:
+                            ActivityListScreen()
+                                .navigationBarHidden(true)
+                                .id(activitiesID)
+                        case .profile:
+                            ProfileScreen(isLoggedIn: $isLoggedIn)
+                                .navigationBarHidden(true)
+                                .id(profileID)
+                        case .search:
+                            EmptyView()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    
+                    // BOTTONE "+" (Solo in Home e se non cerchi)
+                    if !isSearchActive && selectedTab == .home {
                         Button(action: { showCreationWizard = true }) {
                             Image(systemName: "plus")
                                 .font(.title3.weight(.bold))
@@ -44,15 +72,17 @@ struct ContentView: View {
                 }
             }
             .navigationViewStyle(StackNavigationViewStyle())
+            .ignoresSafeArea(.all)
             
-            VStack(spacing: 15) {
+            // 2. LIVELLO UI (SEARCH + TAB BAR)
+            VStack(spacing: 0) {
                 Spacer()
                 
-                // SEARCH BAR
-                if isSearchActive { // Translated Comment
+                // BARRA DI RICERCA
+                if isSearchActive {
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundColor(.white.opacity(0.7))
-                        TextField("Search...", text: $searchText) // Translated Placeholder
+                        TextField("Search place...", text: $searchText)
                             .foregroundColor(.white)
                             .accentColor(.white)
                             .focused($isFocused)
@@ -69,88 +99,96 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.3), lineWidth: 1))
                     .padding(.horizontal, 25)
+                    .padding(.bottom, 15)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(2)
                 }
                 
-                // TAB BAR
-                HStack(spacing: 20) { // Translated Comment
-                    HStack {
-                        CustomTabItem(icon: "house.fill", title: "Home", tab: .home, selected: $selectedTab) // Tab Title in English
-                        Spacer()
-                        CustomTabItem(icon: "list.bullet.rectangle.portrait.fill", title: "Activities", tab: .activities, selected: $selectedTab) // Tab Title in English
-                        Spacer()
-                        CustomTabItem(icon: "person.crop.circle.fill", title: "Profile", tab: .profile, selected: $selectedTab) // Tab Title in English
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 15)
-                    .background(.ultraThinMaterial)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 10)
-                    .overlay(
-                        Capsule().stroke(
-                            LinearGradient(colors: [.white.opacity(0.6), .white.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                            lineWidth: 1.5
-                        )
-                    )
-                    
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            if !isSearchActive {
-                                selectedTab = .home
-                                isSearchActive = true
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { isFocused = true }
-                            } else {
+                // TAB BAR (Nascondi se tastiera è aperta)
+                if !isFocused {
+                    HStack(spacing: 20) {
+                        // Tasti Sinistra
+                        HStack {
+                            CustomTabItem(icon: "house.fill", title: "Home", isActive: selectedTab == .home) {
+                                if selectedTab == .home {
+                                    homeID = UUID(); isSearchActive = false; isFocused = false
+                                } else { selectedTab = .home }
+                            }
+                            Spacer()
+                            CustomTabItem(icon: "list.bullet.rectangle.portrait.fill", title: "Activities", isActive: selectedTab == .activities) {
+                                if selectedTab == .activities { activitiesID = UUID() } else { selectedTab = .activities }
                                 isSearchActive = false
-                                searchText = ""
-                                isFocused = false
+                            }
+                            Spacer()
+                            CustomTabItem(icon: "person.crop.circle.fill", title: "Profile", isActive: selectedTab == .profile) {
+                                if selectedTab == .profile { profileID = UUID() } else { selectedTab = .profile }
+                                isSearchActive = false
                             }
                         }
-                    }) {
-                        Image(systemName: isSearchActive ? "xmark" : "magnifyingglass")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(.ultraThinMaterial)
-                            .background(isSearchActive ? Color.red.opacity(0.8) : Color.appGreen.opacity(0.7))
-                            .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                            .overlay(Circle().stroke(LinearGradient(colors: [.white.opacity(0.8), .white.opacity(0.2)], startPoint: .top, endPoint: .bottom), lineWidth: 1.5))
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 15)
+                        .background(.ultraThinMaterial)
+                        .overlay(Capsule().stroke(LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5))
+                        .clipShape(Capsule())
+                        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+                        
+                        // Tasto Lente (Destra)
+                        Button(action: {
+                            // LOGICA MIGLIORATA PER EVITARE PAGINA BIANCA
+                            if !isSearchActive {
+                                // 1. Prima cambia tab
+                                selectedTab = .home
+                                // 2. Poi attiva la ricerca con un micro ritardo
+                                withAnimation(.spring()) {
+                                    isSearchActive = true
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    isFocused = true
+                                }
+                            } else {
+                                withAnimation(.spring()) {
+                                    isSearchActive = false
+                                    searchText = ""
+                                    isFocused = false
+                                }
+                            }
+                        }) {
+                            Image(systemName: isSearchActive ? "xmark" : "magnifyingglass")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
+                                .background(.ultraThinMaterial)
+                                .background(isSearchActive ? Color.red.opacity(0.8) : Color.appGreen.opacity(0.8))
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                                .overlay(Circle().stroke(LinearGradient(colors: [.white.opacity(0.8), .white.opacity(0.2)], startPoint: .top, endPoint: .bottom), lineWidth: 1.5))
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom, 30)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 30)
             }
         }
-        .edgesIgnoringSafeArea(.bottom)
         .sheet(isPresented: $showCreationWizard) {
             CreationWizardView()
         }
     }
-}
-
-// CustomTabItem (Stays the same) // Translated Comment
-struct CustomTabItem: View {
-    let icon: String; let title: String; let tab: Tab; @Binding var selected: Tab
-    var isSelected: Bool { selected == tab }
-    var body: some View {
-        Button(action: { withAnimation(.spring()) { selected = tab } }) {
-            VStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .appGreen : .gray)
-                if isSelected {
-                    Text(title).font(.caption2).bold().foregroundColor(.appGreen)
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
+    
+    // Helper per chiudere tastiera
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
+// CustomTabItem
+struct CustomTabItem: View {
+    let icon: String; let title: String; let isActive: Bool; let onTap: () -> Void
+    var body: some View {
+        Button(action: { withAnimation(.spring()) { onTap() } }) {
+            VStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 24)).foregroundColor(isActive ? .appGreen : .gray).opacity(isActive ? 1.0 : 0.6)
+                if isActive { Text(title).font(.caption2).bold().foregroundColor(.appGreen) }
+            }.frame(maxWidth: .infinity)
+        }
     }
 }
