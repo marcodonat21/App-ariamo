@@ -40,7 +40,6 @@ struct ProfileScreen: View {
                         HStack {
                             PreferenceBadge(icon: "bell.fill", isActive: userManager.currentUser.notifications)
                             PreferenceBadge(icon: "location.fill", isActive: userManager.currentUser.shareLocation)
-                            // Niente distanza qui, come richiesto
                         }
                         .padding(.horizontal)
                     }
@@ -63,6 +62,10 @@ struct ProfileScreen: View {
                     .padding(.bottom, 120)
                 }
                 .padding(.top)
+            }
+            // *** FIX: Dismiss keyboard on scroll ***
+            .onTapGesture {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
             
             if showLogoutConfirmation {
@@ -202,8 +205,17 @@ struct EditProfileView: View {
     let availableSports = [("Swimming", "figure.pool.swim"), ("Hiking", "figure.hiking"), ("Gym", "dumbbell.fill"), ("Cycling", "bicycle"), ("Tennis", "tennis.racket"), ("Volleyball", "figure.volleyball"), ("Yoga", "figure.yoga"), ("Basketball", "basketball.fill")]
     let columns = [GridItem(.adaptive(minimum: 100))]
     
+    // Lista Paesi
+    let countries = ["🇮🇹 Italy", "🇺🇸 USA", "🇬🇧 UK", "🇫🇷 France", "🇪🇸 Spain", "🇩🇪 Germany", "🇨🇭 Switzerland", "🌍 Other"]
+    
     var body: some View {
         ZStack {
+            // *** FIX: Dismiss keyboard on tap outside ***
+            Color(UIColor.systemGray6).ignoresSafeArea()
+                .onTapGesture {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+            
             VStack(spacing: 0) {
                 // HEADER CUSTOM (Freccia Verde)
                 HStack {
@@ -243,7 +255,7 @@ struct EditProfileView: View {
                         .frame(maxWidth: .infinity).padding(.vertical, 10)
                     }
                     
-                    // --- CREDENTIALS SECTION (AGGIUNTA) ---
+                    // --- CREDENTIALS SECTION ---
                     Section(header: Text("Credentials")) {
                         TextField("Email", text: $user.email)
                             .keyboardType(.emailAddress)
@@ -251,8 +263,8 @@ struct EditProfileView: View {
                         
                         SecureField("Password", text: $user.password)
                     }
-                    // -------------------------------------
                     
+                    // --- PERSONAL DATA (CON PAESE AGGIUNTO) ---
                     Section(header: Text("Personal Data")) {
                         TextField("First Name", text: $user.name)
                         TextField("Last Name", text: $user.surname)
@@ -260,6 +272,14 @@ struct EditProfileView: View {
                             Text("Man").tag("Man"); Text("Woman").tag("Woman")
                             Text("Non-binary").tag("Non-binary"); Text("Prefer not to say").tag("Prefer not to say")
                         }
+                        
+                        // PICKER PAESE
+                        Picker("Country", selection: $user.country) {
+                            ForEach(countries, id: \.self) { c in
+                                Text(c).tag(c)
+                            }
+                        }
+                        
                         Stepper("Age: \(user.age) years", value: $user.age, in: 18...99)
                     }
                     
@@ -295,13 +315,16 @@ struct EditProfileView: View {
                         
                         Toggle("Share Location", isOn: $user.shareLocation).toggleStyle(SwitchToggleStyle(tint: .appGreen))
                         Toggle("Notifications", isOn: $user.notifications).toggleStyle(SwitchToggleStyle(tint: .appGreen))
-                        // NESSUNO SLIDER DISTANZA QUI
                     }
                     
                     Section {
                         Button(action: {
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                             UserManager.shared.saveUser(user)
+                            
+                            // *** AGGIUNTA FONDAMENTALE PER AGGIORNARE LE LISTE PARTECIPANTI ***
+                            ActivityManager.shared.refreshMyParticipantDetails()
+                            
                             presentationMode.wrappedValue.dismiss()
                         }) {
                             Text("Save Changes").bold().frame(maxWidth: .infinity).foregroundColor(.appGreen)

@@ -2,189 +2,126 @@ import SwiftUI
 
 // --- LISTA PARTECIPANTI ---
 struct ParticipantsListView: View {
+    let activityID: UUID
+    @ObservedObject var manager = ActivityManager.shared
     @Environment(\.presentationMode) var presentationMode
     
-    // Dati simulati
-    let participants: [UserProfile] = [
-        UserProfile(name: "Marco", surname: "Donatore", age: 24, gender: "Man", bio: "Love football", motto: "Forza Napoli", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
-        UserProfile(name: "Erika", surname: "Cortese", age: 22, gender: "Woman", bio: "Travel addict", motto: "Carpe Diem", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
-        UserProfile(name: "Arianna", surname: "Trombaccia", age: 18, gender: "Man", bio: "Tech & Gym", motto: "Push limits", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
-        UserManager.shared.currentUser
-    ]
+    var participants: [ParticipantDTO] {
+        return manager.participantsCache[activityID] ?? []
+    }
     
     var body: some View {
-        // STESSA STRUTTURA DI CreatedActivitiesView
-        VStack(spacing: 0) {
-            
-            // HEADER CUSTOM (Copiato dal tuo codice funzionante)
-            HStack {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.appGreen)
-                        .padding(12)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        NavigationView {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                        Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                    }
+                    Spacer(); Text("Participants (\(participants.count))").font(.headline).bold().foregroundColor(.black); Spacer(); Color.clear.frame(width: 44, height: 44)
                 }
-                Spacer()
-                Text("Participants").font(.headline).bold()
-                Spacer()
-                Color.clear.frame(width: 44, height: 44)
-            }
-            .padding()
-            .padding(.top, 40) // Questo è il padding che usavi nel file funzionante
-            
-            // LISTA
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 15) {
-                    ForEach(participants) { user in
-                        NavigationLink(destination: PublicProfileView(user: user)) {
-                            ParticipantRow(user: user)
-                        }
+                .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 15).background(Color(UIColor.systemGray6).ignoresSafeArea())
+                
+                // Lista
+                ScrollView(showsIndicators: false) {
+                    if participants.isEmpty {
+                        VStack(spacing: 20) { Spacer().frame(height: 100); Image(systemName: "person.3.fill").font(.system(size: 60)).foregroundColor(.gray.opacity(0.3)); Text("No participants yet.").font(.headline).foregroundColor(.gray) }.padding(.top, 50)
+                    } else {
+                        LazyVStack(spacing: 15) {
+                            ForEach(participants) { participant in
+                                NavigationLink(destination: PublicProfileView(participant: participant)) {
+                                    ParticipantRow(participant: participant)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }.padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 50)
                     }
                 }
-                .padding()
-                .padding(.bottom, 50)
             }
+            .navigationBarHidden(true)
+            .background(Color(UIColor.systemGray6).ignoresSafeArea())
         }
-        .navigationBarHidden(true)
-        .background(Color(UIColor.systemGray6).ignoresSafeArea()) // Sfondo grigio come le attività
+        .onAppear { Task { await manager.fetchParticipants(for: activityID) } }
     }
 }
 
-// --- RIGA PARTECIPANTE (Stile ActivityRow del tuo codice) ---
+// --- RIGA PARTECIPANTE (FIX IMMAGINE) ---
 struct ParticipantRow: View {
-    let user: UserProfile
+    let participant: ParticipantDTO
     
     var body: some View {
         HStack(spacing: 15) {
-            // Avatar
-            if let data = user.profileImageData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 50, height: 50) // Dimensioni come ActivityRow
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.appGreen, lineWidth: 2))
-            } else {
-                ZStack {
-                    Circle().fill(Color.appGreen.opacity(0.1)) // Sfondo verde chiaro come ActivityRow
-                    Image(systemName: "person.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 25)
-                        .foregroundColor(.appGreen)
-                }
-                .frame(width: 50, height: 50)
-            }
-            
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(user.name) \(user.surname)")
-                    .font(.headline)
-                    .foregroundColor(.black) // Come il tuo codice
+            // AVATAR: Se è un URL usa AsyncImage, altrimenti Icona
+            ZStack {
+                Circle().fill(Color.appGreen.opacity(0.1))
                 
-                Text(user.motto.isEmpty ? "No motto" : user.motto)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
+                if let imgStr = participant.user_image, imgStr.hasPrefix("http"), let url = URL(string: imgStr) {
+                    // FOTO VERA (URL)
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Image(systemName: "person.fill").resizable().scaledToFit().foregroundColor(.appGreen.opacity(0.5)).padding(10)
+                        }
+                    }
+                    .frame(width: 50, height: 50)
+                    .clipShape(Circle())
+                } else {
+                    // ICONA DI SISTEMA
+                    Image(systemName: participant.user_image ?? "person.fill")
+                        .resizable().scaledToFit().frame(width: 24).foregroundColor(.appGreen)
+                }
             }
+            .frame(width: 50, height: 50).clipShape(Circle())
             
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.gray)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(participant.user_name).font(.headline).foregroundColor(.black)
+                if let country = participant.user_country { Text(country).font(.caption).foregroundColor(.gray) }
+            }
+            Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundColor(.gray.opacity(0.4))
         }
-        .padding()
-        .background(Color.white) // Sfondo bianco card
-        .cornerRadius(15)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .padding(16).background(Color.white).cornerRadius(20).shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
-// --- PROFILO PUBBLICO (Stesso layout) ---
+// --- PROFILO PUBBLICO (FIX IMMAGINE) ---
 struct PublicProfileView: View {
-    let user: UserProfile
+    let participant: ParticipantDTO
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         VStack(spacing: 0) {
+            HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2) }; Spacer() }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 10)
             
-            // HEADER
-            HStack {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.appGreen)
-                        .padding(12)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                }
-                Spacer()
-            }
-            .padding()
-            .padding(.top, 40)
-            
-            ScrollView {
-                VStack(spacing: 25) {
-                    
-                    // Foto
-                    if let data = user.profileImageData, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 120, height: 120)
-                            .clipShape(Circle())
-                            .shadow(radius: 5)
-                            .overlay(Circle().stroke(Color.appGreen, lineWidth: 3))
-                    } else {
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .foregroundColor(.gray.opacity(0.3))
-                            .frame(width: 120, height: 120)
-                    }
-                    
-                    // Nome
-                    VStack(spacing: 5) {
-                        Text("\(user.name) \(user.surname)")
-                            .font(.title)
-                            .bold()
-                            .foregroundColor(.black)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 30) {
+                    // FOTO GRANDE
+                    ZStack {
+                        Circle().fill(Color.appGreen.opacity(0.1)).frame(width: 120, height: 120)
                         
-                        Text("\(user.age) years • \(user.gender)")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    // Info Card
-                    VStack(alignment: .leading, spacing: 20) {
-                        if !user.bio.isEmpty {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("BIO").font(.caption).bold().foregroundColor(.appGreen)
-                                Text(user.bio).font(.body).foregroundColor(.black)
+                        if let imgStr = participant.user_image, imgStr.hasPrefix("http"), let url = URL(string: imgStr) {
+                            // FOTO VERA
+                            AsyncImage(url: url) { phase in
+                                if let image = phase.image { image.resizable().scaledToFill() }
+                                else { Image(systemName: "person.fill").resizable().scaledToFit().foregroundColor(.appGreen.opacity(0.5)).padding(30) }
                             }
-                            Divider()
+                            .frame(width: 120, height: 120).clipShape(Circle())
+                        } else {
+                            // ICONA
+                            Image(systemName: participant.user_image ?? "person.fill").resizable().scaledToFit().frame(width: 50).foregroundColor(.appGreen)
                         }
                         
-                        if !user.motto.isEmpty {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("MOTTO").font(.caption).bold().foregroundColor(.appGreen)
-                                Text("\"\(user.motto)\"").font(.body).italic().foregroundColor(.black)
-                            }
-                        }
-                    }
-                    .padding(25)
-                    .background(Color.white)
-                    .cornerRadius(25)
-                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
-                }
-                .padding()
-                .padding(.bottom, 50)
+                        Circle().stroke(Color.appGreen, lineWidth: 3).frame(width: 120, height: 120)
+                    }.padding(.top, 20)
+                    
+                    VStack(spacing: 8) { Text(participant.user_name).font(.title2).bold().foregroundColor(.black); HStack(spacing: 5) { if let age = participant.user_age { Text("\(age) years").font(.subheadline).foregroundColor(.gray) }; if participant.user_age != nil && participant.user_country != nil { Text("•").foregroundColor(.gray) }; if let country = participant.user_country { Text(country).font(.subheadline).foregroundColor(.gray) } } }
+                    Divider().padding(.horizontal, 40)
+                    VStack(alignment: .leading, spacing: 10) { Text("BIO").font(.caption).bold().foregroundColor(.appGreen).tracking(1); Text(participant.user_bio ?? "No bio available.").font(.body).foregroundColor(.black).lineSpacing(4) }.frame(maxWidth: .infinity, alignment: .leading).padding(20).background(Color.white).cornerRadius(20).shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5).padding(.horizontal, 20)
+                    Spacer()
+                }.padding(.bottom, 50)
             }
-        }
-        .navigationBarHidden(true)
-        .background(Color(UIColor.systemGray6).ignoresSafeArea())
+        }.navigationBarHidden(true).background(Color(UIColor.systemGray6).ignoresSafeArea())
     }
 }
+
+struct SocialViews_Previews: PreviewProvider { static var previews: some View { ParticipantsListView(activityID: UUID()) } }
