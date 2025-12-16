@@ -22,7 +22,7 @@ struct AuthLandingScreen: View {
                     .foregroundColor(.appGreen)
                     .padding(.bottom, 10)
                 
-                Text("Welcome! Choose how to access.") // Translated
+                Text("Welcome! Choose how to access.")
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(.gray)
                     .padding(.bottom, 40)
@@ -31,7 +31,7 @@ struct AuthLandingScreen: View {
                 NavigationLink {
                     RegistrationStep1(isLoggedIn: $isLoggedIn)
                 } label: {
-                    Text("Create Account") // Translated
+                    Text("Create Account")
                         .font(.system(.body, design: .rounded))
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -46,7 +46,7 @@ struct AuthLandingScreen: View {
                 NavigationLink {
                     LoginScreen(isLoggedIn: $isLoggedIn)
                 } label: {
-                    Text("Login") // Simplified translation (was "Accedi (Login)")
+                    Text("Login")
                         .font(.system(.body, design: .rounded))
                         .fontWeight(.bold)
                         .foregroundColor(.appGreen)
@@ -61,15 +61,26 @@ struct AuthLandingScreen: View {
                 }
                 .padding(.horizontal, 40)
                 
-                // SOCIAL
+                // SOCIAL LOGIN SECTION
                 VStack(spacing: 15) {
-                    Text("or log in with") // Translated
+                    Text("or log in with")
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.gray)
                     
                     HStack(spacing: 20) {
-                        SocialButtonSmall(icon: "applelogo")
-                        SocialButtonSmall(icon: "g.circle.fill")
+                        // APPLE LOGIN BUTTON
+                        Button(action: {
+                            performSocialLogin(provider: "Apple")
+                        }) {
+                            SocialButtonSmall(icon: "applelogo")
+                        }
+                        
+                        // GOOGLE LOGIN BUTTON
+                        Button(action: {
+                            performSocialLogin(provider: "Google")
+                        }) {
+                            SocialButtonSmall(icon: "g.circle.fill")
+                        }
                     }
                 }
                 .padding(.top, 30)
@@ -77,6 +88,36 @@ struct AuthLandingScreen: View {
             }
         }
         .navigationBarHidden(true)
+    }
+    
+    // --- FUNZIONE PER SIMULARE IL LOGIN SOCIAL ---
+    func performSocialLogin(provider: String) {
+        // 1. Simuliamo un ritardo di rete (opzionale, per realismo)
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        // 2. Creiamo un utente fittizio basato sul provider
+        var socialUser = UserProfile.testUser
+        
+        if provider == "Apple" {
+            socialUser.name = "Apple"
+            socialUser.surname = "User"
+            socialUser.email = "user@icloud.com"
+            socialUser.bio = "Logged in via Apple ID"
+        } else {
+            socialUser.name = "Google"
+            socialUser.surname = "User"
+            socialUser.email = "user@gmail.com"
+            socialUser.bio = "Logged in via Google"
+        }
+        
+        // 3. Salviamo l'utente nel database locale
+        UserManager.shared.saveUser(socialUser)
+        
+        // 4. Entriamo nell'app
+        withAnimation {
+            isLoggedIn = true
+        }
     }
 }
 

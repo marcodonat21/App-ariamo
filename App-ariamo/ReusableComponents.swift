@@ -54,7 +54,7 @@ struct SocialButtonSmall: View {
             .font(.title)
             .foregroundColor(.black)
             .padding()
-            .background(Color.inputGray)
+            .background(Color.themeInput)
             .clipShape(Circle())
     }
 }
@@ -70,7 +70,7 @@ struct GenderButton: View {
                 .foregroundColor(isSelected ? .white : .gray)
                 .padding()
                 .frame(width: 100)
-                .background(isSelected ? Color.appMint : Color.inputGray)
+                .background(isSelected ? Color.appMint : Color.themeInput)
                 .cornerRadius(20)
         }
     }
