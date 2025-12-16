@@ -111,20 +111,23 @@ struct EditActivityView: View {
     func hideKeyboard() { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
     
     func saveChanges() {
-        let updatedActivity = Activity(
-            id: originalActivity.id, // *** FIX CRUCIALE: MANTIENE LO STESSO ID ***
-            title: title,
-            category: category,
-            imageName: originalActivity.imageName,
-            imageData: activityImageData,
-            color: .appGreen,
-            description: description,
-            date: date,
-            locationName: locationName,
-            lat: latitude,
-            lon: longitude
-        )
-        ActivityManager.shared.updateActivity(updatedActivity)
-        presentationMode.wrappedValue.dismiss()
-    }
+            // Creiamo l'attività mantenendo l'ID originale dell'attività che stiamo modificando
+            let updatedActivity = Activity(
+                id: originalActivity.id, // <--- QUESTO EVITA IL DUPLICATO
+                title: title,
+                category: category,
+                imageName: originalActivity.imageName,
+                imageData: activityImageData,
+                color: .appGreen,
+                description: description,
+                date: date,
+                locationName: locationName,
+                lat: latitude,
+                lon: longitude
+            )
+            
+            // Chiamiamo la funzione di update, non quella di create!
+            ActivityManager.shared.updateActivity(updatedActivity)
+            presentationMode.wrappedValue.dismiss()
+        }
 }

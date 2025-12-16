@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AF08CBB92EF1A996002334B0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = AF08CBB82EF1A996002334B0 /* FirebaseFirestore */; };
+		AF08CBBB2EF1A996002334B0 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = AF08CBBA2EF1A996002334B0 /* FirebaseMessaging */; };
+		AF08CBBD2EF1A996002334B0 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = AF08CBBC2EF1A996002334B0 /* FirebaseStorage */; };
+		AF08CBC12EF1B2CF002334B0 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AF08CBC02EF1B2CF002334B0 /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		2EFDB2252EE85B740006CCC5 /* App-ariamo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "App-ariamo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +43,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AF08CBC12EF1B2CF002334B0 /* Supabase in Frameworks */,
+				AF08CBBB2EF1A996002334B0 /* FirebaseMessaging in Frameworks */,
+				AF08CBB92EF1A996002334B0 /* FirebaseFirestore in Frameworks */,
+				AF08CBBD2EF1A996002334B0 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +89,10 @@
 			);
 			name = "App-ariamo";
 			packageProductDependencies = (
+				AF08CBB82EF1A996002334B0 /* FirebaseFirestore */,
+				AF08CBBA2EF1A996002334B0 /* FirebaseMessaging */,
+				AF08CBBC2EF1A996002334B0 /* FirebaseStorage */,
+				AF08CBC02EF1B2CF002334B0 /* Supabase */,
 			);
 			productName = "App-ariamo";
 			productReference = 2EFDB2252EE85B740006CCC5 /* App-ariamo.app */;
@@ -107,6 +122,10 @@
 			);
 			mainGroup = 2EFDB21C2EE85B740006CCC5;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AF08CBB72EF1A996002334B0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				AF08CBBF2EF1B2CF002334B0 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2EFDB2262EE85B740006CCC5 /* Products */;
 			projectDirPath = "";
@@ -264,10 +283,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "App-ariamo/App-ariamo.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 5649DCKM76;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "App-ariamo/Info.plist";
@@ -302,10 +322,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "App-ariamo/App-ariamo.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 5649DCKM76;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "App-ariamo/Info.plist";
@@ -357,6 +378,48 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AF08CBB72EF1A996002334B0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.7.0;
+			};
+		};
+		AF08CBBF2EF1B2CF002334B0 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AF08CBB82EF1A996002334B0 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF08CBB72EF1A996002334B0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		AF08CBBA2EF1A996002334B0 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF08CBB72EF1A996002334B0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		AF08CBBC2EF1A996002334B0 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF08CBB72EF1A996002334B0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		AF08CBC02EF1B2CF002334B0 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF08CBBF2EF1B2CF002334B0 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2EFDB21D2EE85B740006CCC5 /* Project object */;
 }
