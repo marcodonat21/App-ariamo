@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Binding var isLoggedIn: Bool
+    @ObservedObject var manager = ActivityManager.shared
     
     @State private var showCreationWizard = false
     @State private var selectedTab: AppTab = .home
@@ -17,21 +18,12 @@ struct ContentView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             
-            // 1. LIVELLO MAPPA/CONTENUTO
             NavigationView {
                 ZStack(alignment: .topTrailing) {
                     
-                    // GESTORE CHIUSURA TASTIERA GLOBALE
-                    // Questo sfondo invisibile cattura i tap quando la tastiera è aperta
-                    if isFocused || isSearchActive {
-                        Color.black.opacity(0.001) // Quasi invisibile ma interattivo
-                            .ignoresSafeArea()
-                            .onTapGesture {
-                                hideKeyboard()
-                                isFocused = false
-                            }
-                            .zIndex(1) // Stare sopra al contenuto ma sotto alla UI
-                    }
+                    // *** HO RIMOSSO IL BLOCCO "GESTORE CHIUSURA TASTIERA" QUI ***
+                    // Prima c'era un Color.black.opacity(0.001) che bloccava la mappa.
+                    // Ora è stato tolto, quindi puoi toccare e muovere la mappa liberamente.
                     
                     Group {
                         switch selectedTab {
@@ -74,7 +66,7 @@ struct ContentView: View {
             .navigationViewStyle(StackNavigationViewStyle())
             .ignoresSafeArea(.all)
             
-            // 2. LIVELLO UI (SEARCH + TAB BAR)
+            // TAB BAR & SEARCH
             VStack(spacing: 0) {
                 Spacer()
                 
@@ -87,6 +79,11 @@ struct ContentView: View {
                             .accentColor(.white)
                             .focused($isFocused)
                             .submitLabel(.search)
+                            // Chiude la tastiera quando premi "Cerca" sulla tastiera
+                            .onSubmit {
+                                hideKeyboard()
+                            }
+                        
                         if !searchText.isEmpty {
                             Button(action: { searchText = "" }) {
                                 Image(systemName: "xmark.circle.fill").foregroundColor(.white.opacity(0.7))
@@ -103,10 +100,9 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
-                // TAB BAR (Nascondi se tastiera è aperta)
+                // TAB BAR (Visibile solo se tastiera chiusa)
                 if !isFocused {
                     HStack(spacing: 20) {
-                        // Tasti Sinistra
                         HStack {
                             CustomTabItem(icon: "house.fill", title: "Home", isActive: selectedTab == .home) {
                                 if selectedTab == .home {
@@ -131,25 +127,14 @@ struct ContentView: View {
                         .clipShape(Capsule())
                         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
                         
-                        // Tasto Lente (Destra)
+                        // LENTE DI RICERCA
                         Button(action: {
-                            // LOGICA MIGLIORATA PER EVITARE PAGINA BIANCA
                             if !isSearchActive {
-                                // 1. Prima cambia tab
                                 selectedTab = .home
-                                // 2. Poi attiva la ricerca con un micro ritardo
-                                withAnimation(.spring()) {
-                                    isSearchActive = true
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    isFocused = true
-                                }
+                                withAnimation(.spring()) { isSearchActive = true }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isFocused = true }
                             } else {
-                                withAnimation(.spring()) {
-                                    isSearchActive = false
-                                    searchText = ""
-                                    isFocused = false
-                                }
+                                withAnimation(.spring()) { isSearchActive = false; searchText = ""; isFocused = false }
                             }
                         }) {
                             Image(systemName: isSearchActive ? "xmark" : "magnifyingglass")
@@ -172,15 +157,23 @@ struct ContentView: View {
         .sheet(isPresented: $showCreationWizard) {
             CreationWizardView()
         }
+        // DEEP LINK NOTIFICHE
+        .sheet(isPresented: $manager.showDetailFromNotification) {
+            if let act = manager.selectedActivityFromNotification {
+                ActivityDetailView(activity: act)
+            }
+        }
+        .onAppear {
+            NotificationHelper.shared.requestPermission()
+        }
     }
     
-    // Helper per chiudere tastiera
     func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
-// CustomTabItem
+// CustomTabItem (Resta invariato)
 struct CustomTabItem: View {
     let icon: String; let title: String; let isActive: Bool; let onTap: () -> Void
     var body: some View {
