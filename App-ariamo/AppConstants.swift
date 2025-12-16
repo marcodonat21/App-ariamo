@@ -3,9 +3,9 @@ import Foundation
 import Combine
 import CoreLocation
 import UserNotifications
-import Supabase // <--- Assicurati che il pacchetto sia aggiunto
+import Supabase
 
-// --- 1. COLOR CONFIGURATION ---
+// --- 1. CONFIGURAZIONE COLORI ---
 extension Color {
     static let themeBackground = Color(UIColor.systemGroupedBackground)
     static let themeCard = Color(UIColor.secondarySystemGroupedBackground)
@@ -16,7 +16,7 @@ extension Color {
 
 enum AppTab { case home, activities, profile, search }
 
-// --- 2. FILTRI ---
+// --- 2. FILTRI E IMPOSTAZIONI ---
 enum SortOption: String, CaseIterable { case name = "Name"; case date = "Date" }
 enum ParticipationFilter: String, CaseIterable { case all = "All"; case joined = "Joined"; case favorites = "Favorites"; case notJoined = "Not Joined" }
 
@@ -39,15 +39,6 @@ class FilterSettings: ObservableObject {
         let userLoc = ActivityManager.userLocation
         
         if enableDateFilter { result = result.filter { $0.date >= startDate && $0.date <= endDate } }
-        if enableTimeFilter {
-            let calendar = Calendar.current
-            let startM = calendar.component(.hour, from: startTime) * 60 + calendar.component(.minute, from: startTime)
-            let endM = calendar.component(.hour, from: endTime) * 60 + calendar.component(.minute, from: endTime)
-            result = result.filter { act in
-                let actM = calendar.component(.hour, from: act.date) * 60 + calendar.component(.minute, from: act.date)
-                return actM >= startM && actM <= endM
-            }
-        }
         switch participationStatus {
         case .joined: result = result.filter { manager.isJoined(activity: $0) }
         case .favorites: result = result.filter { manager.isFavorite(activity: $0) }
@@ -72,40 +63,24 @@ class FilterSettings: ObservableObject {
 
 // --- 3. MANAGERS ---
 
-// GESTORE NOTIFICHE
 class NotificationHelper: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationHelper()
-    
-    override init() {
-        super.init()
-        UNUserNotificationCenter.current().delegate = self
-    }
-    
-    func requestPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
-    }
+    override init() { super.init(); UNUserNotificationCenter.current().delegate = self }
+    func requestPermission() { UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in } }
     
     static func scheduleNotification(for activity: Activity) {
         let center = UNUserNotificationCenter.current()
         let ids = ["\(activity.id)_24", "\(activity.id)_1"]
-        
         center.removePendingNotificationRequests(withIdentifiers: ids)
-        center.removeDeliveredNotifications(withIdentifiers: ids)
-        
         func addRequest(id: String, title: String, body: String, date: Date) {
             if date > Date() {
                 let content = UNMutableNotificationContent()
-                content.title = title
-                content.body = body
-                content.sound = .default
-                content.userInfo = ["activityId": activity.id.uuidString]
-                
+                content.title = title; content.body = body; content.sound = .default; content.userInfo = ["activityId": activity.id.uuidString]
                 let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
                 let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
                 center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
             }
         }
-        
         addRequest(id: ids[0], title: "Reminder: \(activity.title)", body: "Your activity is tomorrow!", date: activity.date.addingTimeInterval(-86400))
         addRequest(id: ids[1], title: "Get Ready: \(activity.title)", body: "Starts in 1 hour!", date: activity.date.addingTimeInterval(-3600))
     }
@@ -113,285 +88,325 @@ class NotificationHelper: NSObject, UNUserNotificationCenterDelegate {
     static func cancelNotification(for activity: Activity) {
         let ids = ["\(activity.id)_24", "\(activity.id)_1"]
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
     }
     
-    // GESTIONE CLICK NOTIFICA
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
-        
-        if let activityIDString = userInfo["activityId"] as? String,
-           let uuid = UUID(uuidString: activityIDString) {
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                ActivityManager.shared.openDetailFor(activityID: uuid)
-            }
+        if let idStr = userInfo["activityId"] as? String, let uuid = UUID(uuidString: idStr) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { ActivityManager.shared.openDetailFor(activityID: uuid) }
         }
         completionHandler()
     }
-    
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound])
-    }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) { completionHandler([.banner, .sound]) }
 }
 
-// --- ACTIVITY MANAGER (SUPABASE COMPLETO: CREATE, UPDATE, DELETE) ---
+// --- DTO PARTECIPANTI ---
+struct ParticipantDTO: Codable, Identifiable {
+    var id: Int?
+    let activity_id: UUID
+    let user_id: UUID
+    let user_name: String
+    let user_image: String?
+    let user_age: Int?
+    let user_bio: String?
+    let user_country: String?
+}
+
+// STRUCT PER AGGIORNAMENTO
+struct ParticipantUpdatePayload: Codable {
+    let user_name: String
+    let user_image: String? // Aggiunto per aggiornare foto
+    let user_bio: String
+    let user_age: Int
+    let user_country: String
+}
+
 class ActivityManager: ObservableObject {
     static let shared = ActivityManager()
     
-    // *** I TUOI DATI SUPABASE (GIA' INSERITI) ***
     let supabaseURL = URL(string: "https://ywuvltphmcvtlswanmyj.supabase.co")!
     let supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3dXZsdHBobWN2dGxzd2FubXlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4ODk5MjEsImV4cCI6MjA4MTQ2NTkyMX0.mKW1vNu5EMKlxByD7HFLMcKcMr5G8vUiMc9dnfM5-2o"
     
     private var client: SupabaseClient
     
+    @Published var allActivities: [Activity] = []
     @Published var joinedActivities: [Activity] = []
     @Published var createdActivities: [Activity] = []
     @Published var favoriteActivities: [UUID] = []
+    @Published var participantsCache: [UUID: [ParticipantDTO]] = [:]
     
-    // Deep Linking
-    @Published var selectedActivityFromNotification: Activity? = nil
     @Published var showDetailFromNotification: Bool = false
+    @Published var selectedActivityFromNotification: Activity? = nil
+    
+    private var isSaving = false
     
     static let userLocation = CLLocation(latitude: 40.8518, longitude: 14.2681)
     
-    // DEFAULT FALLBACK
-    static let defaultActivities: [Activity] = [
-        Activity(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, title: "Da Michele Pizzeria", category: "Food", imageName: "fork.knife", imageData: UIImage(named: "pizza")?.jpegData(compressionQuality: 0.8), color: .orange, description: "La pizza più famosa di Napoli.", date: Date().addingTimeInterval(3600*24), locationName: "Via Cesare Sersale, 1", lat: 40.8498, lon: 14.2633),
-        Activity(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, title: "Stadio Maradona", category: "Sports", imageName: "figure.soccer", imageData: UIImage(named: "stadium")?.jpegData(compressionQuality: 0.8), color: .blue, description: "Il tempio del calcio.", date: Date().addingTimeInterval(3600*48), locationName: "Piazzale Tecchio", lat: 40.8279, lon: 14.1930),
-        Activity(id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!, title: "Passeggiata Lungomare", category: "Travel & Adventure", imageName: "sun.max.fill", imageData: UIImage(named: "sea")?.jpegData(compressionQuality: 0.8), color: .yellow, description: "Vista sul Vesuvio.", date: Date().addingTimeInterval(3600*5), locationName: "Via Caracciolo", lat: 40.8322, lon: 14.2426)
-    ]
+    // TROVA QUESTA PARTE E SOSTITUISCILA COSÌ:
+    static let defaultActivities: [Activity] = []
+    // (Prima c'erano Maradona, Pizzeria ecc, ora li abbiamo cancellati)
     
     init() {
-        self.client = SupabaseClient(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+        self.client = SupabaseClient(
+            supabaseURL: supabaseURL,
+            supabaseKey: supabaseKey,
+            options: .init(auth: .init(emitLocalSessionAsInitialSession: true))
+        )
+        
         loadLocalData()
-        _ = NotificationHelper.shared
-        Task { await fetchActivities() }
-    }
-    
-    // --- 1. FETCH (SCARICA) ---
-    func fetchActivities() async {
-        do {
-            let activities: [ActivityDTO] = try await client.from("activities").select().execute().value
-            DispatchQueue.main.async {
-                self.createdActivities = activities.map { $0.toActivity() }
-                print("📡 Scaricati \(self.createdActivities.count) eventi da Supabase")
-            }
-        } catch {
-            print("❌ Errore Supabase Fetch: \(error)")
+        Task {
+            await fetchActivities()
+            await fetchMyJoinedActivities()
         }
     }
     
-    // --- 2. CREATE (CREA) ---
+    // --- SUPABASE ACTIONS ---
+    
+    func fetchActivities() async {
+        do {
+            let dtos: [ActivityDTO] = try await client.from("activities").select().execute().value
+            let activities = dtos.map { $0.toActivity() }
+            DispatchQueue.main.async {
+                self.allActivities = activities
+                let myId = UserManager.shared.currentUser.id
+                self.createdActivities = activities.filter { $0.creatorId == myId }
+            }
+        } catch { print("❌ Fetch error: \(error)") }
+    }
+    
+    func fetchMyJoinedActivities() async {
+        let myId = UserManager.shared.currentUser.id
+        do {
+            let myParticipations: [ParticipantDTO] = try await client.from("participants").select().eq("user_id", value: myId.uuidString).execute().value
+            let activityIDs = myParticipations.map { $0.activity_id }
+            DispatchQueue.main.async {
+                self.joinedActivities = self.allActivities.filter { activityIDs.contains($0.id) }
+            }
+        } catch { print("❌ Error fetching my joined activities: \(error)") }
+    }
+    
     func create(activity: Activity) {
-        // UI Immediata
+        guard !isSaving else { return }
+        isSaving = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.isSaving = false }
+        
         DispatchQueue.main.async {
             self.createdActivities.append(activity)
-            self.join(activity: activity)
+            self.allActivities.append(activity)
         }
         
         Task {
-            var finalActivity = activity
-            // Upload Foto se presente
-            if let data = activity.imageData, let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
+            var finalAct = activity
+            let creatorId = UserManager.shared.currentUser.id
+            if let data = activity.imageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
                 let fileName = "\(activity.id.uuidString).jpg"
-                do {
-                    try await client.storage.from("images").upload(path: fileName, file: compressed, options: FileOptions(contentType: "image/jpeg"))
-                    let publicURL = try client.storage.from("images").getPublicURL(path: fileName)
-                    finalActivity.imageURL = publicURL.absoluteString
-                    finalActivity.imageData = nil
-                } catch { print("⚠️ Errore upload foto: \(error)") }
+                try? await client.storage.from("images").upload(path: fileName, file: comp, options: FileOptions(contentType: "image/jpeg"))
+                let url = try? client.storage.from("images").getPublicURL(path: fileName)
+                finalAct.imageURL = url?.absoluteString; finalAct.imageData = nil
             }
-            // Salva nel DB
+            let dto = ActivityDTO(from: finalAct, creatorIdOverride: creatorId)
             do {
-                let dto = ActivityDTO(from: finalActivity)
                 try await client.from("activities").insert(dto).execute()
-                print("✅ CREATE SUCCESSO: Attività salvata online!")
-            } catch { print("❌ ERRORE CREATE DB: \(error)") }
+                print("✅ Attività creata")
+                joinActivityOnline(activity: finalAct)
+            } catch {
+                print("❌ DB error: \(error)")
+                DispatchQueue.main.async {
+                    self.createdActivities.removeAll { $0.id == activity.id }
+                    self.allActivities.removeAll { $0.id == activity.id }
+                }
+            }
         }
     }
     
-    // --- 3. DELETE (CANCELLA) ---
     func delete(activity: Activity) {
-        // 1. Rimuovi subito dalla UI locale (Ottimistico)
         DispatchQueue.main.async {
             self.createdActivities.removeAll { $0.id == activity.id }
             self.joinedActivities.removeAll { $0.id == activity.id }
-            self.saveCreated()
-            self.saveJoined()
+            self.allActivities.removeAll { $0.id == activity.id }
+            self.saveCreated(); self.saveJoined()
         }
-        
-        // 2. Cancella da Supabase
-        Task {
-            do {
-                // Cancella la riga dove id == activity.id
-                try await client.from("activities").delete().eq("id", value: activity.id.uuidString).execute()
-                print("🗑️ DELETE SUCCESSO: Attività eliminata online!")
-                
-                // Opzionale: Prova a cancellare anche la foto dallo storage (se esiste)
-                // Non è critico se fallisce, quindi ignoriamo errori qui
-                let fileName = "\(activity.id.uuidString).jpg"
-                let _ = try? await client.storage.from("images").remove(paths: [fileName])
-                
-            } catch {
-                print("❌ ERRORE DELETE DB: \(error)")
-                // Se fallisce, in teoria dovremmo rimetterla nella UI, ma per ora lasciamo così
-            }
-        }
+        Task { try? await client.from("activities").delete().eq("id", value: activity.id.uuidString).execute() }
     }
     
-    // --- 4. UPDATE (MODIFICA SENZA DUPLICATI) ---
-        func updateActivity(_ updatedActivity: Activity) {
-            // 1. Aggiorna subito la UI locale
-            DispatchQueue.main.async {
-                if let index = self.createdActivities.firstIndex(where: { $0.id == updatedActivity.id }) {
-                    self.createdActivities[index] = updatedActivity
-                }
-                if let index = self.joinedActivities.firstIndex(where: { $0.id == updatedActivity.id }) {
-                    self.joinedActivities[index] = updatedActivity
-                }
-                self.objectWillChange.send()
+    func updateActivity(_ updatedActivity: Activity) {
+        DispatchQueue.main.async {
+            if let i = self.createdActivities.firstIndex(where: { $0.id == updatedActivity.id }) { self.createdActivities[i] = updatedActivity }
+            if let i = self.joinedActivities.firstIndex(where: { $0.id == updatedActivity.id }) { self.joinedActivities[i] = updatedActivity }
+            if let i = self.allActivities.firstIndex(where: { $0.id == updatedActivity.id }) { self.allActivities[i] = updatedActivity }
+            self.saveCreated(); self.saveJoined(); self.objectWillChange.send()
+        }
+        Task {
+            var finalAct = updatedActivity
+            if let data = finalAct.imageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
+                let fileName = "\(finalAct.id.uuidString).jpg"
+                try? await client.storage.from("images").upload(path: fileName, file: comp, options: FileOptions(contentType: "image/jpeg", upsert: true))
+                let url = try? client.storage.from("images").getPublicURL(path: fileName)
+                finalAct.imageURL = url?.absoluteString; finalAct.imageData = nil
+            }
+            let dto = ActivityDTO(from: finalAct, creatorIdOverride: finalAct.creatorId)
+            try? await client.from("activities").update(dto).eq("id", value: finalAct.id.uuidString).execute()
+        }
+    }
+
+    // Sostituisci la vecchia joinActivityOnline con questa:
+        func joinActivityOnline(activity: Activity) {
+            // Se è un'attività di default (finta), unisciti solo localmente
+            if ActivityManager.defaultActivities.contains(where: { $0.id == activity.id }) {
+                DispatchQueue.main.async { self.join(activity: activity) }
+                return
             }
             
-            // 2. Aggiorna su Supabase
+            let user = UserManager.shared.currentUser
+            
             Task {
-                var finalActivity = updatedActivity
+                // 1. Determina quale immagine usare (URL o Icona)
+                var finalUserImageString = user.image // Parte con il valore attuale (es. "person.fill" o un vecchio URL)
                 
-                // Gestione Foto con Sovrascrittura (Upsert)
-                if let data = finalActivity.imageData, let compressed = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
-                    let fileName = "\(finalActivity.id.uuidString).jpg"
-                    do {
-                        // 'upsert: true' dice a Supabase di sovrascrivere la vecchia foto
-                        try await client.storage.from("images").upload(path: fileName, file: compressed, options: FileOptions(contentType: "image/jpeg", upsert: true))
-                        
-                        let publicURL = try client.storage.from("images").getPublicURL(path: fileName)
-                        finalActivity.imageURL = publicURL.absoluteString
-                        finalActivity.imageData = nil
-                    } catch { print("⚠️ Errore foto: \(error)") }
+                // Se l'utente ha una foto in memoria (scelta in registrazione/profilo), CARICALA ORA
+                if let data = user.profileImageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
+                    let fileName = "avatar_\(user.id.uuidString).jpg"
+                    
+                    // Upload su Supabase
+                    try? await client.storage.from("images").upload(
+                        path: fileName,
+                        file: comp,
+                        options: FileOptions(contentType: "image/jpeg", upsert: true)
+                    )
+                    
+                    // Ottieni URL Pubblico
+                    if let url = try? client.storage.from("images").getPublicURL(path: fileName) {
+                        finalUserImageString = url.absoluteString // Ecco l'URL della foto vera!
+                    }
                 }
                 
-                // Salva le modifiche nel Database
+                // 2. Crea il partecipante con la stringa dell'immagine corretta (URL o Icona)
+                let p = ParticipantDTO(
+                    activity_id: activity.id,
+                    user_id: user.id,
+                    user_name: "\(user.name) \(user.surname)",
+                    user_image: finalUserImageString, // <--- QUI PASSA L'URL
+                    user_age: user.age,
+                    user_bio: user.bio,
+                    user_country: user.country
+                )
+                
                 do {
-                    let dto = ActivityDTO(from: finalActivity)
-                    // .update() modifica la riga, .eq() trova quella con l'ID giusto
-                    try await client.from("activities")
-                        .update(dto)
-                        .eq("id", value: finalActivity.id.uuidString)
-                        .execute()
-                    print("✏️ UPDATE SUCCESSO: Nessun duplicato creato!")
+                    try await client.from("participants").insert(p).execute()
+                    await fetchParticipants(for: activity.id)
+                    DispatchQueue.main.async { self.join(activity: activity) }
                 } catch {
-                    print("❌ ERRORE UPDATE DB: \(error)")
+                    print("❌ Join error: \(error)")
                 }
             }
         }
     
-    // --- Funzioni Locali (Join/Preferiti) ---
-    private func loadLocalData() {
-        if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let decoded = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = decoded }
-        if let data = UserDefaults.standard.data(forKey: "favorites"), let decoded = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = decoded }
+    func refreshMyParticipantDetails() {
+        let user = UserManager.shared.currentUser
+        Task {
+            var userImageUrl = user.image
+            // Upload anche durante il refresh se necessario
+            if let data = user.profileImageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
+                let fileName = "avatar_\(user.id.uuidString).jpg"
+                try? await client.storage.from("images").upload(path: fileName, file: comp, options: FileOptions(contentType: "image/jpeg", upsert: true))
+                if let url = try? client.storage.from("images").getPublicURL(path: fileName) {
+                    userImageUrl = url.absoluteString
+                }
+            }
+            
+            let payload = ParticipantUpdatePayload(
+                user_name: "\(user.name) \(user.surname)",
+                user_image: userImageUrl, // Aggiorna anche la foto
+                user_bio: user.bio,
+                user_age: user.age,
+                user_country: user.country
+            )
+            
+            do {
+                try await client.from("participants").update(payload).eq("user_id", value: user.id.uuidString).execute()
+                print("✅ Dati aggiornati!")
+            } catch { print("⚠️ Errore refresh: \(error)") }
+        }
     }
+    
+    func leaveActivityOnline(activity: Activity) {
+        let userId = UserManager.shared.currentUser.id
+        Task {
+            do {
+                try await client.from("participants").delete().eq("activity_id", value: activity.id.uuidString).eq("user_id", value: userId.uuidString).execute()
+                await fetchParticipants(for: activity.id)
+                DispatchQueue.main.async { self.leave(activity: activity) }
+            } catch { print("❌ Leave error: \(error)") }
+        }
+    }
+
+    func fetchParticipants(for activityID: UUID) async {
+        do {
+            let res: [ParticipantDTO] = try await client.from("participants").select().eq("activity_id", value: activityID.uuidString).execute().value
+            DispatchQueue.main.async { self.participantsCache[activityID] = res }
+        } catch { print("❌ Error fetching participants") }
+    }
+    
+    // Logica Locale
+    private func loadLocalData() {
+        if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let dec = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = dec }
+        if let data = UserDefaults.standard.data(forKey: "favorites"), let dec = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = dec }
+    }
+    func join(activity: Activity) { if !isJoined(activity: activity) { joinedActivities.append(activity); saveJoined(); NotificationHelper.scheduleNotification(for: activity) } }
+    func leave(activity: Activity) { joinedActivities.removeAll { $0.id == activity.id }; saveJoined(); NotificationHelper.cancelNotification(for: activity) }
+    func toggleFavorite(activity: Activity) { if favoriteActivities.contains(activity.id) { favoriteActivities.removeAll { $0 == activity.id } } else { favoriteActivities.append(activity.id) }; saveFavorites() }
+    func isFavorite(activity: Activity) -> Bool { favoriteActivities.contains(activity.id) }
+    func isCreator(activity: Activity) -> Bool { return activity.creatorId == UserManager.shared.currentUser.id }
+    func isJoined(activity: Activity) -> Bool { joinedActivities.contains(where: { $0.id == activity.id }) }
     
     func openDetailFor(activityID: UUID) {
-        let found = createdActivities.first { $0.id == activityID }
-            ?? joinedActivities.first { $0.id == activityID }
-            ?? ActivityManager.defaultActivities.first { $0.id == activityID }
+        let found = allActivities.first { $0.id == activityID } ?? ActivityManager.defaultActivities.first { $0.id == activityID }
         if let act = found { self.selectedActivityFromNotification = act; self.showDetailFromNotification = true }
     }
-    
-    func join(activity: Activity) { if !joinedActivities.contains(where: { $0.id == activity.id }) { joinedActivities.append(activity); saveJoined(); NotificationHelper.scheduleNotification(for: activity) } }
-    func leave(activity: Activity) { joinedActivities.removeAll { $0.id == activity.id }; saveJoined(); NotificationHelper.cancelNotification(for: activity) }
-    
-    func toggleFavorite(activity: Activity) { if favoriteActivities.contains(activity.id) { favoriteActivities.removeAll { $0 == activity.id } } else { favoriteActivities.append(activity.id) }; saveFavorites() }
-    func isFavorite(activity: Activity) -> Bool { return favoriteActivities.contains(activity.id) }
-    func isJoined(activity: Activity) -> Bool { return joinedActivities.contains(where: { $0.id == activity.id }) }
-    func isCreator(activity: Activity) -> Bool {
-        // Verifica se l'ID esiste tra quelle create
-        // (Nota: in un'app reale controlleremmo l'User ID, ma per ora va bene così)
-        return createdActivities.contains(where: { $0.id == activity.id })
-    }
-    
-    private func saveJoined() { if let encoded = try? JSONEncoder().encode(joinedActivities) { UserDefaults.standard.set(encoded, forKey: "joinedActivities") } }
-    private func saveCreated() { if let encoded = try? JSONEncoder().encode(createdActivities) { UserDefaults.standard.set(encoded, forKey: "createdActivities") } }
-    private func saveFavorites() { if let encoded = try? JSONEncoder().encode(favoriteActivities) { UserDefaults.standard.set(encoded, forKey: "favorites") } }
+    private func saveJoined() { if let enc = try? JSONEncoder().encode(joinedActivities) { UserDefaults.standard.set(enc, forKey: "joinedActivities") } }
+    private func saveCreated() { if let enc = try? JSONEncoder().encode(createdActivities) { UserDefaults.standard.set(enc, forKey: "createdActivities") } }
+    private func saveFavorites() { if let enc = try? JSONEncoder().encode(favoriteActivities) { UserDefaults.standard.set(enc, forKey: "favorites") } }
 }
 
-// --- DTO: Struttura per Supabase (Mappa le colonne del DB snake_case) ---
 struct ActivityDTO: Codable {
-    let id: UUID
-    let title: String
-    let category: String
-    let image_url: String?      // snake_case per DB
-    let image_name: String      // snake_case per DB
-    let description: String
-    let date: Double            // Timestamp
-    let location_name: String
-    let latitude: Double
-    let longitude: Double
-    let color_hex: String
+    let id: UUID; let title: String; let category: String; let image_url: String?; let image_name: String; let description: String; let date: Double; let location_name: String; let latitude: Double; let longitude: Double
+    let creator_id: UUID?
     
-    init(from activity: Activity) {
-        self.id = activity.id
-        self.title = activity.title
-        self.category = activity.category
-        self.image_url = activity.imageURL
-        self.image_name = activity.imageName
-        self.description = activity.description
-        self.date = activity.date.timeIntervalSince1970
-        self.location_name = activity.locationName
-        self.latitude = activity.latitude
-        self.longitude = activity.longitude
-        self.color_hex = activity.color.description
+    init(from act: Activity, creatorIdOverride: UUID? = nil) {
+        id = act.id; title = act.title; category = act.category; image_url = act.imageURL; image_name = act.imageName; description = act.description; date = act.date.timeIntervalSince1970; location_name = act.locationName; latitude = act.latitude; longitude = act.longitude
+        creator_id = creatorIdOverride ?? act.creatorId
     }
     
     func toActivity() -> Activity {
-        // Scarica immagine sincrona se presente URL (per semplicità in visualizzazione mappa)
-        var imgData: Data? = nil
-        if let urlStr = image_url, let url = URL(string: urlStr) {
-             imgData = try? Data(contentsOf: url)
-        }
-        
-        return Activity(
-            id: id,
-            title: title,
-            category: category,
-            imageName: image_name,
-            imageData: imgData,
-            imageURL: image_url,
-            color: .green,
-            description: description,
-            date: Date(timeIntervalSince1970: date),
-            location_name: location_name,
-            lat: latitude,
-            lon: longitude
-        )
+        var d: Data? = nil; if let u = image_url, let url = URL(string: u) { d = try? Data(contentsOf: url) }
+        return Activity(id: id, title: title, category: category, imageName: image_name, imageData: d, imageURL: image_url, color: .appGreen, description: description, date: Date(timeIntervalSince1970: date), locationName: location_name, lat: latitude, lon: longitude, creatorId: creator_id ?? UUID())
     }
 }
 
-// --- ACTIVITY STRUCT ---
-struct CodableColor: Codable { let red, green, blue, opacity: Double }
 struct Activity: Identifiable, Hashable, Codable {
-    let id: UUID; let title: String; let category: String; let imageName: String;
-    var imageData: Data?; var imageURL: String?
-    let latitude: Double; let longitude: Double; private let codableColor: CodableColor; var description: String; var date: Date; var locationName: String
+    let id: UUID; let title: String; let category: String; let imageName: String; var imageData: Data?; var imageURL: String?; let latitude: Double; let longitude: Double; var description: String; var date: Date; var locationName: String
+    let creatorId: UUID
     
-    // INIT MODIFICATO PER GESTIRE location_name
-    init(id: UUID = UUID(), title: String, category: String = "Sports", imageName: String, imageData: Data? = nil, imageURL: String? = nil, color: Color, description: String = "Activity description...", date: Date = Date(), locationName: String = "Naples, IT", location_name: String? = nil, lat: Double = 40.8518, lon: Double = 14.2681) {
-        self.id = id; self.title = title; self.category = category; self.imageName = imageName; self.imageData = imageData; self.imageURL = imageURL; self.description = description; self.date = date;
-        // Priorità al parametro locationName, altrimenti usa location_name (dal DB), altrimenti default
-        self.locationName = locationName != "Naples, IT" ? locationName : (location_name ?? "Naples, IT")
-        self.latitude = lat; self.longitude = lon
-        if color == .red { self.codableColor = CodableColor(red: 1, green: 0, blue: 0, opacity: 1) } else if color == .orange { self.codableColor = CodableColor(red: 1, green: 0.5, blue: 0, opacity: 1) } else if color == .yellow { self.codableColor = CodableColor(red: 1, green: 1, blue: 0, opacity: 1) } else { self.codableColor = CodableColor(red: 0, green: 1, blue: 0, opacity: 1) }
+    init(id: UUID = UUID(), title: String, category: String = "Sports", imageName: String, imageData: Data? = nil, imageURL: String? = nil, color: Color, description: String = "", date: Date = Date(), locationName: String = "Naples", lat: Double = 40.85, lon: Double = 14.26, creatorId: UUID = UUID()) {
+        self.id = id; self.title = title; self.category = category; self.imageName = imageName; self.imageData = imageData; self.imageURL = imageURL; self.description = description; self.date = date; self.locationName = locationName; self.latitude = lat; self.longitude = lon
+        self.creatorId = creatorId
     }
-    
-    var color: Color { Color(.sRGB, red: codableColor.red, green: codableColor.green, blue: codableColor.blue, opacity: codableColor.opacity) }
-    static func == (lhs: Activity, rhs: Activity) -> Bool { return lhs.id == rhs.id }
+    static func == (lhs: Activity, rhs: Activity) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    var color: Color { .appGreen }
 }
 
-// ... (UserProfile, Validator, CustomBackButton, DatiEvento, UserManager rimangono invariati)
-struct UserProfile: Identifiable, Codable { var id = UUID(); var name: String; var surname: String; var age: Int; var gender: String; var bio: String; var motto: String; var image: String; var profileImageData: Data? = nil; var email: String; var password: String; var interests: Set<String>; var shareLocation: Bool; var notifications: Bool }
-extension UserProfile { static let testUser = UserProfile(name: "App", surname: "Ariamoci", age: 25, gender: "Non-binary", bio: "Welcome!", motto: "Let's connect!", image: "person.crop.circle.fill", profileImageData: nil, email: "test@email.com", password: "Appariamoci2025!", interests: [], shareLocation: true, notifications: true) }
+struct UserProfile: Identifiable, Codable { var id = UUID(); var name, surname: String; var age: Int; var gender, bio, motto, image: String; var profileImageData: Data? = nil; var email, password: String; var interests: Set<String>; var shareLocation, notifications: Bool; var country: String = "🇮🇹 Italy" }
+extension UserProfile { static let testUser = UserProfile(name: "App", surname: "Ariamoci", age: 25, gender: "Non-binary", bio: "Welcome!", motto: "Let's connect!", image: "person.crop.circle.fill", profileImageData: nil, email: "test@email.com", password: "Appariamoci2025!", interests: [], shareLocation: true, notifications: true, country: "🇮🇹 Italy") }
+class UserManager: ObservableObject { static let shared = UserManager(); @Published var currentUser: UserProfile; init() { if let d = UserDefaults.standard.data(forKey: "savedUser"), let dec = try? JSONDecoder().decode(UserProfile.self, from: d) { self.currentUser = dec } else { self.currentUser = UserProfile.testUser } }; func saveUser(_ u: UserProfile) { self.currentUser = u; if let enc = try? JSONEncoder().encode(u) { UserDefaults.standard.set(enc, forKey: "savedUser") } }; func deleteUser() { UserDefaults.standard.removeObject(forKey: "savedUser"); self.currentUser = UserProfile.testUser } }
 struct Validator { static func isValidEmail(_ e: String) -> Bool { NSPredicate(format:"SELF MATCHES %@", "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}").evaluate(with: e) }; static func isValidPassword(_ p: String) -> Bool { NSPredicate(format:"SELF MATCHES %@", "^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$").evaluate(with: p) } }
-struct CustomBackButton: View { @Environment(\.presentationMode) var presentationMode; var body: some View { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2) } } }
-struct DatiEvento { var titolo: String = ""; var tipo: String = ""; var descrizione: String = ""; var data: Date = Date(); var luogo: String = ""; var imageData: Data? = nil; var lat: Double? = nil; var lon: Double? = nil }
-class UserManager: ObservableObject { static let shared = UserManager(); @Published var currentUser: UserProfile; init() { if let data = UserDefaults.standard.data(forKey: "savedUser"), let decoded = try? JSONDecoder().decode(UserProfile.self, from: data) { self.currentUser = decoded } else { self.currentUser = UserProfile.testUser } }; func saveUser(_ user: UserProfile) { self.currentUser = user; if let encoded = try? JSONEncoder().encode(user) { UserDefaults.standard.set(encoded, forKey: "savedUser") } }; func deleteUser() { UserDefaults.standard.removeObject(forKey: "savedUser"); self.currentUser = UserProfile.testUser } }
+struct CustomBackButton: View { @Environment(\.presentationMode) var pm; var body: some View { Button(action: { pm.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2) } } }
+struct DatiEvento { var titolo, tipo, descrizione: String; var data: Date; var luogo: String; var imageData: Data?; var lat, lon: Double?; init() { titolo=""; tipo=""; descrizione=""; data=Date(); luogo=""; imageData=nil; lat=nil; lon=nil } }
+
+// --- EXTENSION PER PREVIEW ---
+extension Activity {
+    static let testActivity = Activity(id: UUID(), title: "Test", imageName: "star", color: .blue, creatorId: UUID())
+}
+extension ParticipantDTO {
+    static let testParticipant = ParticipantDTO(id: 1, activity_id: UUID(), user_id: UUID(), user_name: "Test", user_image: "person", user_age: 20, user_bio: "Bio", user_country: "Italy")
+}

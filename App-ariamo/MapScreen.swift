@@ -34,46 +34,45 @@ struct MapScreen: View {
     )
     
     // Calcolo dei Pin da mostrare
-    var filteredLocations: [MapLocation] {
-        let allActivities = Array(Set(
-            ActivityManager.defaultActivities +
-            manager.createdActivities +
-            manager.joinedActivities
-        ))
-        
-        let filteredActs = filters.apply(to: allActivities)
-        
-        var locations = filteredActs.map { act in
-            MapLocation(
-                id: act.id,
-                name: act.title,
-                coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude),
-                imageName: act.imageName,
-                description: act.description,
-                imageData: act.imageData
-            )
+        var filteredLocations: [MapLocation] {
+            // *** MODIFICA: Solo manager.allActivities (Database) ***
+            let allActivities = manager.allActivities
+            
+            // Rimuoviamo duplicati (se ci sono)
+            let uniqueActivities = Array(Dictionary(grouping: allActivities, by: { $0.id }).compactMap { $0.value.first })
+            
+            let filteredActs = filters.apply(to: uniqueActivities)
+            
+            var locations = filteredActs.map { act in
+                MapLocation(
+                    id: act.id,
+                    name: act.title,
+                    coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude),
+                    imageName: act.imageName,
+                    description: act.description,
+                    imageData: act.imageData
+                )
+            }
+            
+            if !searchText.isEmpty {
+                locations = locations.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+            }
+            
+            return locations
         }
         
-        if !searchText.isEmpty {
-            locations = locations.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        // Gestione selezione "Viva"
+        var liveSelectedLocation: MapLocation? {
+            guard let current = selectedLocation else { return nil }
+            
+            // *** MODIFICA: Cerca solo nel manager ***
+            let found = manager.allActivities.first(where: { $0.id == current.id })
+            
+            if let act = found {
+                return MapLocation(id: act.id, name: act.title, coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude), imageName: act.imageName, description: act.description, imageData: act.imageData)
+            }
+            return nil
         }
-        
-        return locations
-    }
-    
-    // Gestione selezione "Viva"
-    var liveSelectedLocation: MapLocation? {
-        guard let current = selectedLocation else { return nil }
-        
-        let found = manager.createdActivities.first(where: { $0.id == current.id })
-            ?? manager.joinedActivities.first(where: { $0.id == current.id })
-            ?? ActivityManager.defaultActivities.first(where: { $0.id == current.id })
-        
-        if let act = found {
-            return MapLocation(id: act.id, name: act.title, coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude), imageName: act.imageName, description: act.description, imageData: act.imageData)
-        }
-        return nil
-    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -86,7 +85,7 @@ struct MapScreen: View {
                     withAnimation { selectedLocation = nil }
                 }
             
-            // MAPPA (Logica estratta per aiutare il compilatore)
+            // MAPPA
             Map(coordinateRegion: $region, annotationItems: filteredLocations + [
                 MapLocation(id: UUID(), name: "ME", coordinate: ActivityManager.userLocation.coordinate, imageName: "person.fill", description: "", imageData: nil)
             ]) { location in
@@ -139,7 +138,7 @@ struct MapScreen: View {
         }
     }
     
-    // --- HELPER VIEW BUILDER (Risolve l'errore del compilatore) ---
+    // --- HELPER VIEW BUILDER ---
     @ViewBuilder
     func annotationView(for location: MapLocation) -> some View {
         if location.name == "ME" {
@@ -157,8 +156,7 @@ struct MapScreen: View {
     
     var destinationView: some View {
         if let loc = liveSelectedLocation {
-            let found = manager.createdActivities.first(where: { $0.id == loc.id })
-                ?? manager.joinedActivities.first(where: { $0.id == loc.id })
+            let found = manager.allActivities.first(where: { $0.id == loc.id })
                 ?? ActivityManager.defaultActivities.first(where: { $0.id == loc.id })
             
             if let act = found {
@@ -199,7 +197,7 @@ struct UserLocationPin: View {
     }
 }
 
-// 4. PIN ATTIVITÀ (Mancava nel tuo file)
+// 4. PIN ATTIVITÀ (MODIFICATO: NOME SEMPRE VISIBILE)
 struct MapPinView: View {
     let location: MapLocation
     @ObservedObject var manager: ActivityManager
@@ -215,7 +213,7 @@ struct MapPinView: View {
                     let isFavorite = manager.favoriteActivities.contains(location.id)
                     
                     Circle()
-                        .fill(isJoined ? Color.appGreen : Color.red)
+                        .fill(isJoined ? Color.appGreen : (isCreatedByMe ? Color.blue : Color.red))
                         .frame(width: 40, height: 40)
                         .shadow(radius: 4)
                         .overlay(Circle().stroke(Color.white, lineWidth: 2))
@@ -226,39 +224,33 @@ struct MapPinView: View {
                     
                     if isCreatedByMe {
                         Image(systemName: "star.fill")
-                            .foregroundColor(.yellow)
-                            .font(.caption)
-                            .padding(3)
-                            .background(Circle().fill(Color.white))
-                            .offset(x: 14, y: -14)
+                            .foregroundColor(.yellow).font(.caption).padding(3).background(Circle().fill(Color.white)).offset(x: 14, y: -14)
                     }
                     
                     if isFavorite {
                         Image(systemName: "heart.fill")
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .padding(3)
-                            .background(Circle().fill(Color.white))
-                            .offset(x: -14, y: -14)
+                            .foregroundColor(.red).font(.caption).padding(3).background(Circle().fill(Color.white)).offset(x: -14, y: -14)
                     }
                 }
                 
+                // *** QUI È LA MODIFICA: Rimossa l'opacity condizionale ***
                 Text(location.name)
-                    .font(.caption)
-                    .bold()
+                    .font(.system(size: 10, weight: .bold)) // Testo piccolo e grassetto
                     .foregroundColor(.black)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(4)
+                    .padding(.vertical, 3)
+                    .background(Color.white) // Sfondo bianco sempre visibile
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1) // Ombra per staccare dalla mappa
+                    // .opacity(...) <- RIMOSSO!
             }
-            .scaleEffect(selectedLocation?.id == location.id ? 1.2 : 1.0)
+            .scaleEffect(selectedLocation?.id == location.id ? 1.3 : 1.0) // Ingrandisce se cliccato
             .animation(.spring(), value: selectedLocation?.id)
         }
     }
 }
 
-// 5. CARD MAPPA (Mancava nel tuo file)
+// 5. CARD MAPPA
 struct MapLocationCard: View {
     let location: MapLocation
     let onTap: () -> Void
@@ -268,12 +260,7 @@ struct MapLocationCard: View {
         ZStack(alignment: .topTrailing) {
             HStack(alignment: .center, spacing: 15) {
                 if let data = location.imageData, let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.appGreen, lineWidth: 2))
+                    Image(uiImage: uiImage).resizable().scaledToFill().frame(width: 60, height: 60).clipShape(Circle()).overlay(Circle().stroke(Color.appGreen, lineWidth: 2))
                 } else {
                     ZStack {
                         Circle().fill(Color.appGreen.opacity(0.15)).frame(width: 60, height: 60)
@@ -287,10 +274,7 @@ struct MapLocationCard: View {
                 }
                 
                 Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.gray.opacity(0.5))
-                    .padding(.trailing, 20)
+                Image(systemName: "chevron.right").foregroundColor(.gray.opacity(0.5)).padding(.trailing, 20)
             }
             .padding(20)
             .background(Color.themeCard)
@@ -299,14 +283,18 @@ struct MapLocationCard: View {
             .onTapGesture(perform: onTap)
             
             Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.gray.opacity(0.4))
-                    .padding(10)
+                Image(systemName: "xmark.circle.fill").font(.title2).foregroundColor(.gray.opacity(0.4)).padding(10)
             }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 120)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+// --- PREVIEW ---
+struct MapScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        MapScreen(searchText: .constant(""), isSearchActive: .constant(false))
     }
 }

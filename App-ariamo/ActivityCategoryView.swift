@@ -13,23 +13,26 @@ struct ActivityCategoryView: View {
     @State private var showFilters = false
     
     // Logica di filtraggio
-    var filteredActivities: [Activity] {
-        // 1. Uniamo Default + Create
-        let allActivities = ActivityManager.defaultActivities + manager.createdActivities
-        
-        // 2. Filtriamo per Categoria
-        var result = allActivities.filter { $0.category == category }
-        
-        // 3. Applichiamo i Filtri Avanzati (Data, Ora, Distanza, Preferiti)
-        result = filters.apply(to: result)
-        
-        // 4. Filtriamo per Testo (Barra di ricerca)
-        if !searchText.isEmpty {
-            result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+        var filteredActivities: [Activity] {
+            // *** MODIFICA: Solo manager.allActivities (Database) ***
+            let rawActivities = manager.allActivities
+            
+            // Rimuoviamo duplicati
+            let allActivities = Array(Dictionary(grouping: rawActivities, by: { $0.id }).compactMap { $0.value.first })
+            
+            // 2. Filtriamo per Categoria
+            var result = allActivities.filter { $0.category == category }
+            
+            // 3. Applichiamo i Filtri
+            result = filters.apply(to: result)
+            
+            // 4. Filtriamo per Testo
+            if !searchText.isEmpty {
+                result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+            }
+            
+            return result
         }
-        
-        return result
-    }
     
     var body: some View {
         ZStack {
@@ -72,7 +75,6 @@ struct ActivityCategoryView: View {
                         VStack(spacing: 15) {
                             ForEach(filteredActivities) { activity in
                                 NavigationLink(destination: ActivityDetailView(activity: activity)) {
-                                    // *** USARE QUESTO NOME DIVERSO ***
                                     DetailedActivityRow(activity: activity)
                                 }
                             }
@@ -90,11 +92,10 @@ struct ActivityCategoryView: View {
     }
 }
 
-// --- ACTIVITY ROW DETTAGLIATA (CON CUORE E SPUNTA) ---
-// Abbiamo cambiato nome per non andare in conflitto con quella del Profilo
+// --- ROW DETTAGLIATA (Necessaria qui perché usata dalla lista) ---
 struct DetailedActivityRow: View {
     let activity: Activity
-    @ObservedObject var manager = ActivityManager.shared // Osserva i cambiamenti (cuori/join)
+    @ObservedObject var manager = ActivityManager.shared
     
     var body: some View {
         HStack(spacing: 15) {
@@ -130,25 +131,15 @@ struct DetailedActivityRow: View {
             
             Spacer()
             
-            // ICONE STATO (Cuore + Spunta)
+            // Icone Stato
             HStack(spacing: 8) {
-                // Cuore Rosso (Se Preferito)
                 if manager.isFavorite(activity: activity) {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.caption)
+                    Image(systemName: "heart.fill").foregroundColor(.red).font(.caption)
                 }
-                
-                // Spunta Verde (Se Partecipi)
                 if manager.isJoined(activity: activity) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.appGreen)
-                        .font(.caption)
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(.appGreen).font(.caption)
                 }
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.gray)
-                    .font(.caption)
+                Image(systemName: "chevron.right").foregroundColor(.gray).font(.caption)
             }
         }
         .padding()

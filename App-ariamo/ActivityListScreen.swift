@@ -13,15 +13,14 @@ struct ActivityListScreen: View {
     
     let columns = [GridItem(.adaptive(minimum: 160), spacing: 20)]
     
-    // --- STATI NECESSARI PER IL FIX ---
-    // ActivityCategoryView ora richiede questi due parametri
+    // Stati per la navigazione
     @State private var searchText = ""
     @State private var isSearchActive = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color.themeBackground.ignoresSafeArea() // Sfondo Dark Mode compatibile
+                Color.themeBackground.ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 20) {
@@ -38,8 +37,8 @@ struct ActivityListScreen: View {
                             ForEach(categories, id: \.0) { category in
                                 NavigationLink(destination: ActivityCategoryView(
                                     category: category.0,
-                                    searchText: $searchText,       // <--- FIX: Passiamo la variabile
-                                    isSearchActive: $isSearchActive // <--- FIX: Passiamo la variabile
+                                    searchText: $searchText,
+                                    isSearchActive: $isSearchActive
                                 )) {
                                     CategoryCard(title: category.0, icon: category.1, color: category.2)
                                 }
@@ -81,14 +80,16 @@ struct CategoryCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.themeCard) // Card colore adattivo
+        .background(Color.themeCard)
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
+// --- PREVIEW PER ACTIVITYLISTSCREEN ---
 struct ActivityListScreen_Previews: PreviewProvider {
     static var previews: some View {
         ActivityListScreen()
+            .previewDisplayName("Lista Categorie")
     }
 }

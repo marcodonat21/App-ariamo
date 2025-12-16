@@ -1,275 +1,230 @@
 import SwiftUI
 import PhotosUI
 
-// --- STEP 1: CREDENTIALS & NAME ---
+// Oggetto temporaneo per accumulare i dati durante la registrazione
+struct RegistrationData {
+    var name = ""
+    var surname = ""
+    var email = ""
+    var password = ""
+    var bio = ""
+    var motto = ""
+    var age = 18
+    var gender = "Man"
+    var country = "🇮🇹 Italy"
+    var image: Data? = nil
+    var interests: Set<String> = []
+}
+
+// --- STEP 1: CREDENTIALS ---
 struct RegistrationStep1: View {
     @Binding var isLoggedIn: Bool
-    @State private var name = ""; @State private var surname = ""; @State private var email = ""; @State private var password = ""
+    @State private var data = RegistrationData() // Dati accumulati
     @Environment(\.presentationMode) var presentationMode
-    @State private var navigateToNext = false; @State private var showAlert = false; @State private var alertMessage = ""
+    @State private var navigateToNext = false
+    @State private var showAlert = false; @State private var alertMessage = ""
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height).clipped().ignoresSafeArea(.all)
-                Color.white.opacity(0.92).ignoresSafeArea(.all)
-               
-                ScrollView(showsIndicators: false) {
+                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width).clipped().ignoresSafeArea()
+                Color.white.opacity(0.92).ignoresSafeArea()
+                
+                ScrollView {
                     VStack(spacing: 25) {
-                        // HEADER CON NUOVO BACK BUTTON
+                        // Header
                         ZStack {
                             HStack {
-                                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.appGreen)
-                                        .padding(12)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                                }
-                                Spacer()
+                                Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.headline).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(radius: 4) }; Spacer()
                             }
-                            Text("Step 1/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray)
+                            Text("Step 1/4").font(.subheadline).bold().foregroundColor(.gray)
                         }.padding(.top, 60)
-                       
-                        Text("Who are you?").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen)
-                       
+                        
+                        Text("Who are you?").font(.title).bold().foregroundColor(.appGreen)
+                        
                         VStack(spacing: 20) {
-                            CustomTextField(placeholder: "Name *", text: $name)
-                            CustomTextField(placeholder: "Surname *", text: $surname)
-                            CustomTextField(placeholder: "Email *", text: $email)
-                            CustomTextField(placeholder: "Password *", text: $password, isSecure: true)
-                            Text("Password must be at least 8 characters, contain a number and a special character.").font(.caption2).foregroundColor(.gray).multilineTextAlignment(.center).padding(.horizontal)
+                            CustomTextField(placeholder: "Name *", text: $data.name)
+                            CustomTextField(placeholder: "Surname *", text: $data.surname)
+                            CustomTextField(placeholder: "Email *", text: $data.email)
+                            CustomTextField(placeholder: "Password *", text: $data.password, isSecure: true)
                         }
-                       
-                        Spacer().frame(height: 30)
-                       
+                        
                         Button(action: {
-                            endEditing()
-                            if name.isEmpty || surname.isEmpty || email.isEmpty || password.isEmpty { alertMessage = "Please fill in all fields marked with *."; showAlert = true }
-                            else if !Validator.isValidEmail(email) { alertMessage = "Invalid email format. Must contain '@' and '.'"; showAlert = true }
-                            else if !Validator.isValidPassword(password) { alertMessage = "Password is too weak.\nIt must have min 8 chars, 1 number, and 1 special character."; showAlert = true }
+                            if data.name.isEmpty || data.surname.isEmpty || data.email.isEmpty || data.password.isEmpty { alertMessage = "Fill all fields"; showAlert = true }
                             else { navigateToNext = true }
                         }) {
-                            Text("Continue").font(.system(.headline, design: .rounded).bold()).foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                            Text("Continue").font(.headline).bold().foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(radius: 10)
                         }
-                        .alert(isPresented: $showAlert) { Alert(title: Text("Attention"), message: Text(alertMessage), dismissButton: .default(Text("OK"))) }
-                       
-                        NavigationLink(isActive: $navigateToNext) { RegistrationStep2(isLoggedIn: $isLoggedIn) } label: { EmptyView() }
-                        Spacer()
-                    }.frame(minHeight: geometry.size.height).padding(.horizontal)
+                        .alert(isPresented: $showAlert) { Alert(title: Text("Error"), message: Text(alertMessage), dismissButton: .default(Text("OK"))) }
+                        
+                        // Passiamo 'data' al prossimo step
+                        NavigationLink(isActive: $navigateToNext) { RegistrationStep2(isLoggedIn: $isLoggedIn, data: data) } label: { EmptyView() }
+                    }.padding(.horizontal).frame(minHeight: geometry.size.height)
                 }
             }
-        }.onTapGesture { endEditing() }.ignoresSafeArea(.keyboard, edges: .bottom).navigationBarHidden(true)
+        }.onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }.navigationBarHidden(true)
     }
 }
 
-// --- STEP 2: PERSONAL DETAILS & PHOTO ---
+// --- STEP 2: DETAILS ---
 struct RegistrationStep2: View {
     @Binding var isLoggedIn: Bool
-    @State private var bio = ""; @State private var motto = ""; @State private var age = 18; @State private var gender = "Man"
+    @State var data: RegistrationData // Riceve dati
     
-    // --- STATI FOTO ---
-    @State private var profileImageData: Data? = nil
     @State private var showCamera = false; @State private var showGallery = false; @State private var showActionSheet = false
     @State private var selectedItem: PhotosPickerItem? = nil; @State private var inputImage: UIImage? = nil
-    // ------------------
-
-    @Environment(\.presentationMode) var presentationMode
     @State private var navigateToNext = false
+    @Environment(\.presentationMode) var presentationMode
+    
+    let countries = ["🇮🇹 Italy", "🇺🇸 USA", "🇬🇧 UK", "🇫🇷 France", "🇪🇸 Spain", "🇩🇪 Germany", "🇨🇭 Switzerland", "🌍 Other"]
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height).clipped().ignoresSafeArea(.all)
-                Color.white.opacity(0.92).ignoresSafeArea(.all)
-               
-                ScrollView(showsIndicators: false) {
+                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width).clipped().ignoresSafeArea()
+                Color.white.opacity(0.92).ignoresSafeArea()
+                
+                ScrollView {
                     VStack(spacing: 25) {
-                        // HEADER CON NUOVO BACK BUTTON
                         ZStack {
-                            HStack {
-                                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.appGreen)
-                                        .padding(12)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                                }
-                                Spacer()
-                            }
-                            VStack { Text("Step 2/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray); Text("Tell us about you").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen) }
+                            HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.headline).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(radius: 4) }; Spacer() }
+                            VStack { Text("Step 2/4").font(.subheadline).bold().foregroundColor(.gray); Text("Details").font(.title).bold().foregroundColor(.appGreen) }
                         }.padding(.top, 60)
-                       
+                        
                         VStack(spacing: 20) {
-                            // --- SEZIONE FOTO ---
-                            VStack(alignment: .center, spacing: 10) {
-                                ZStack {
-                                    Circle().fill(Color.appGreen.opacity(0.1)).frame(width: 120, height: 120)
-                                    if let data = profileImageData, let uiImage = UIImage(data: data) { Image(uiImage: uiImage).resizable().scaledToFill().frame(width: 120, height: 120).clipShape(Circle()) }
-                                    else { Image(systemName: "person.crop.circle.fill").resizable().aspectRatio(contentMode: .fit).frame(width: 60, height: 60).foregroundColor(.appGreen) }
-                                    VStack { Spacer(); HStack { Spacer(); Image(systemName: "camera.fill").foregroundColor(.white).padding(8).background(Color.appGreen).clipShape(Circle()).overlay(Circle().stroke(Color.white, lineWidth: 2)) } }.frame(width: 120, height: 120)
-                                }.onTapGesture { showActionSheet = true }
-                                Text("Tap photo to set").font(.caption).foregroundColor(.gray)
-                            }
-                            .confirmationDialog("Set Profile Photo", isPresented: $showActionSheet) {
-                                Button("Take a photo") { showCamera = true }; Button("Choose from Gallery") { showGallery = true }
-                                if profileImageData != nil { Button("Remove photo", role: .destructive) { profileImageData = nil } }
-                                Button("Cancel", role: .cancel) { }
-                            } message: { Text("Choose how to set your image") }
-                            // --------------------
-
-                            CustomTextField(placeholder: "Bio", text: $bio)
-                            CustomTextField(placeholder: "Your Motto", text: $motto)
-                           
-                            HStack(spacing: 10) {
-                                HStack(spacing: 5) {
-                                    Text("Gender:").font(.caption).foregroundColor(.gray).fixedSize()
-                                    Picker("", selection: $gender) { Text("Man").tag("Man"); Text("Woman").tag("Woman"); Text("Non-binary").tag("Non-binary"); Text("Prefer not to say").tag("Prefer not to say") }
-                                    .accentColor(.appGreen).labelsHidden().fixedSize()
-                                }
-                                .padding(10).background(Color.white).cornerRadius(30)
-                               
-                                Spacer()
-                                HStack(spacing: 5) { Text("Age: \(age)").font(.caption).foregroundColor(.gray).fixedSize(); Stepper("", value: $age, in: 18...99).labelsHidden().scaleEffect(0.9) }.padding(10).background(Color.white).cornerRadius(30)
-                            }.padding(.horizontal, 10)
+                            // Foto
+                            ZStack {
+                                Circle().fill(Color.appGreen.opacity(0.1)).frame(width: 120, height: 120)
+                                if let d = data.image, let ui = UIImage(data: d) { Image(uiImage: ui).resizable().scaledToFill().frame(width: 120, height: 120).clipShape(Circle()) }
+                                else { Image(systemName: "person.crop.circle.fill").resizable().scaledToFit().frame(width: 60).foregroundColor(.appGreen) }
+                                Image(systemName: "camera.fill").foregroundColor(.white).padding(8).background(Color.appGreen).clipShape(Circle()).offset(x: 40, y: 40)
+                            }.onTapGesture { showActionSheet = true }
+                            
+                            CustomTextField(placeholder: "Bio", text: $data.bio)
+                            CustomTextField(placeholder: "Motto", text: $data.motto)
+                            
+                            HStack {
+                                Picker("Gender", selection: $data.gender) { Text("Man").tag("Man"); Text("Woman").tag("Woman") }.pickerStyle(SegmentedPickerStyle())
+                                Stepper("\(data.age) yrs", value: $data.age, in: 18...99)
+                            }.padding()
+                            
+                            Picker("Country", selection: $data.country) { ForEach(countries, id: \.self) { Text($0).tag($0) } }.pickerStyle(MenuPickerStyle()).padding().background(Color.white).cornerRadius(10)
                         }
-                       
-                        Spacer().frame(height: 30)
-                       
-                        Button(action: { endEditing(); navigateToNext = true }) {
-                            Text("Continue").font(.system(.headline, design: .rounded).bold()).foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                        
+                        Button(action: { navigateToNext = true }) {
+                            Text("Continue").font(.headline).bold().foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(radius: 10)
                         }
-                       
-                        NavigationLink(isActive: $navigateToNext) { RegistrationStep3(isLoggedIn: $isLoggedIn, profileImageData: profileImageData) } label: { EmptyView() }
-                        Spacer()
-                    }.frame(minHeight: geometry.size.height).padding(.horizontal)
+                        NavigationLink(isActive: $navigateToNext) { RegistrationStep3(isLoggedIn: $isLoggedIn, data: data) } label: { EmptyView() }
+                    }.padding(.horizontal).frame(minHeight: geometry.size.height)
                 }
             }
         }
-        .onTapGesture { endEditing() }.ignoresSafeArea(.keyboard, edges: .bottom).navigationBarHidden(true)
+        .confirmationDialog("Photo", isPresented: $showActionSheet) { Button("Camera") { showCamera = true }; Button("Gallery") { showGallery = true } }
         .sheet(isPresented: $showCamera) { CameraPicker(selectedImage: $inputImage) }
         .photosPicker(isPresented: $showGallery, selection: $selectedItem, matching: .images)
-        .onChange(of: inputImage) { newImage in if let newImage = newImage, let data = newImage.jpegData(compressionQuality: 0.8) { profileImageData = data } }
-        .onChange(of: selectedItem) { newItem in Task { if let data = try? await newItem?.loadTransferable(type: Data.self) { profileImageData = data } } }
+        .onChange(of: inputImage) { new in if let new = new { data.image = new.jpegData(compressionQuality: 0.8) } }
+        .onChange(of: selectedItem) { item in Task { if let d = try? await item?.loadTransferable(type: Data.self) { data.image = d } } }
+        .navigationBarHidden(true)
     }
 }
 
 // --- STEP 3: SPORTS ---
 struct RegistrationStep3: View {
     @Binding var isLoggedIn: Bool
-    var profileImageData: Data? // RICEVE FOTO
-    @State private var selectedSports: Set<String> = []
+    @State var data: RegistrationData
+    @State private var navigateToNext = false
     @Environment(\.presentationMode) var presentationMode
+    
     let sports = [("Swimming", "figure.pool.swim"), ("Hiking", "figure.hiking"), ("Gym", "dumbbell.fill"), ("Cycling", "bicycle"), ("Tennis", "tennis.racket"), ("Volleyball", "figure.volleyball")]
     let columns = [GridItem(.adaptive(minimum: 100))]
-    @State private var navigateToNext = false; @State private var showAlert = false
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height).clipped().ignoresSafeArea(.all)
-                Color.white.opacity(0.92).ignoresSafeArea(.all)
-               
-                ScrollView(showsIndicators: false) {
+                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width).clipped().ignoresSafeArea()
+                Color.white.opacity(0.92).ignoresSafeArea()
+                
+                ScrollView {
                     VStack(spacing: 25) {
-                        // HEADER CON NUOVO BACK BUTTON
                         ZStack {
-                            HStack {
-                                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.appGreen)
-                                        .padding(12)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                                }
-                                Spacer()
-                            }
-                            VStack { Text("Step 3/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray); Text("Your Sports *").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen) }
+                            HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.headline).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(radius: 4) }; Spacer() }
+                            VStack { Text("Step 3/4").font(.subheadline).bold().foregroundColor(.gray); Text("Sports").font(.title).bold().foregroundColor(.appGreen) }
                         }.padding(.top, 60)
-                       
+                        
                         LazyVGrid(columns: columns, spacing: 15) {
                             ForEach(sports, id: \.0) { sport in
-                                Button(action: { if selectedSports.contains(sport.0) { selectedSports.remove(sport.0) } else { selectedSports.insert(sport.0) } }) {
+                                Button(action: { if data.interests.contains(sport.0) { data.interests.remove(sport.0) } else { data.interests.insert(sport.0) } }) {
                                     VStack { Image(systemName: sport.1).font(.title2); Text(sport.0).font(.caption).bold() }
-                                    .frame(maxWidth: .infinity).padding(.vertical, 15).background(selectedSports.contains(sport.0) ? Color.appGreen : Color.white).foregroundColor(selectedSports.contains(sport.0) ? .white : .gray).cornerRadius(20).shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 15)
+                                    .background(data.interests.contains(sport.0) ? Color.appGreen : Color.white)
+                                    .foregroundColor(data.interests.contains(sport.0) ? .white : .gray)
+                                    .cornerRadius(20).shadow(radius: 2)
                                 }
                             }
                         }.padding()
-                       
-                        Spacer().frame(height: 30)
-                        Button(action: { if selectedSports.isEmpty { showAlert = true } else { navigateToNext = true } }) {
-                            Text("Continue").font(.system(.headline, design: .rounded).bold()).foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                        
+                        Button(action: { navigateToNext = true }) {
+                            Text("Continue").font(.headline).bold().foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(radius: 10)
                         }
-                        .alert(isPresented: $showAlert) { Alert(title: Text("Select Sport"), message: Text("Please select at least one sport."), dismissButton: .default(Text("OK"))) }
-                        NavigationLink(isActive: $navigateToNext) { RegistrationStep4(isLoggedIn: $isLoggedIn, profileImageData: profileImageData) } label: { EmptyView() }
-                        Spacer()
-                    }.frame(minHeight: geometry.size.height).padding(.horizontal)
+                        NavigationLink(isActive: $navigateToNext) { RegistrationStep4(isLoggedIn: $isLoggedIn, data: data) } label: { EmptyView() }
+                    }.padding(.horizontal).frame(minHeight: geometry.size.height)
                 }
             }
-        }.ignoresSafeArea(.keyboard, edges: .bottom).navigationBarHidden(true)
+        }.navigationBarHidden(true)
     }
 }
 
-// --- STEP 4 AGGIORNATO (NO DISTANZA) ---
+// --- STEP 4: FINISH ---
 struct RegistrationStep4: View {
     @Binding var isLoggedIn: Bool
-    var profileImageData: Data?
+    @State var data: RegistrationData
     @State private var sharePos = true; @State private var notif = true
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height).clipped().ignoresSafeArea(.all)
-                Color.white.opacity(0.92).ignoresSafeArea(.all)
+                Image("app_foto").resizable().scaledToFill().frame(width: UIScreen.main.bounds.width).clipped().ignoresSafeArea()
+                Color.white.opacity(0.92).ignoresSafeArea()
                 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 25) {
-                        ZStack {
-                            HStack {
-                                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.appGreen)
-                                        .padding(12)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                                }
-                                Spacer()
-                            }
-                            VStack { Text("Step 4/4").font(.system(.subheadline, design: .rounded).bold()).foregroundColor(.gray); Text("Preferences").font(.system(.title, design: .rounded).bold()).foregroundColor(.appGreen) }
-                        }.padding(.top, 60)
-                        
-                        // SOLO TOGGLE, NIENTE SLIDER
-                        VStack(spacing: 20) {
-                            VStack(spacing: 15) { Toggle("Share Location", isOn: $sharePos); Toggle("Receive Notifications", isOn: $notif) }.padding().background(Color.white).cornerRadius(20).toggleStyle(SwitchToggleStyle(tint: .appGreen))
-                        }.padding(.horizontal)
-                        
-                        Spacer().frame(height: 30)
-                        
-                        Button(action: {
-                            endEditing()
-                            var newUser = UserProfile.testUser
-                            newUser.profileImageData = profileImageData
-                            newUser.shareLocation = sharePos
-                            newUser.notifications = notif
-                            // maxDistance non viene settato qui
-                            UserManager.shared.saveUser(newUser)
-                            withAnimation { isLoggedIn = true }
-                        }) {
-                            Text("Go!").font(.system(.headline, design: .rounded).bold()).foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(color: .appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
-                        }
-                        Spacer()
-                    }.frame(minHeight: geometry.size.height).padding(.horizontal)
-                }
+                VStack(spacing: 25) {
+                    ZStack {
+                        HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.headline).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(radius: 4) }; Spacer() }
+                        VStack { Text("Step 4/4").font(.subheadline).bold().foregroundColor(.gray); Text("Privacy").font(.title).bold().foregroundColor(.appGreen) }
+                    }.padding(.top, 60)
+                    
+                    VStack(spacing: 15) { Toggle("Share Location", isOn: $sharePos); Toggle("Notifications", isOn: $notif) }
+                        .padding().background(Color.white).cornerRadius(20).toggleStyle(SwitchToggleStyle(tint: .appGreen))
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        // CREAZIONE NUOVO UTENTE
+                        var newUser = UserProfile(
+                            id: UUID(), // *** NUOVO ID UNIVOCO ***
+                            name: data.name,
+                            surname: data.surname,
+                            age: data.age,
+                            gender: data.gender,
+                            bio: data.bio,
+                            motto: data.motto,
+                            image: "person.crop.circle.fill",
+                            profileImageData: data.image,
+                            email: data.email,
+                            password: data.password,
+                            interests: data.interests,
+                            shareLocation: sharePos,
+                            notifications: notif,
+                            country: data.country
+                        )
+                        UserManager.shared.saveUser(newUser)
+                        withAnimation { isLoggedIn = true }
+                    }) {
+                        Text("Finish!").font(.headline).bold().foregroundColor(.white).padding().frame(width: 140).background(Color.appGreen).cornerRadius(30).shadow(radius: 10)
+                    }
+                    Spacer()
+                }.padding(.horizontal)
             }
-        }.onTapGesture { endEditing() }.ignoresSafeArea(.keyboard, edges: .bottom).navigationBarHidden(true)
+        }.navigationBarHidden(true)
     }
 }
