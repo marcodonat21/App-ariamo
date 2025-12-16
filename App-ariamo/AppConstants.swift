@@ -70,27 +70,81 @@ class FilterSettings: ObservableObject {
 }
 
 // --- 3. MANAGERS ---
-class NotificationHelper {
+
+class NotificationHelper: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationHelper()
+    
+    override init() {
+        super.init()
+        UNUserNotificationCenter.current().delegate = self
+    }
+    
+    func requestPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+    
     static func scheduleNotification(for activity: Activity) {
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if granted {
-                let content24 = UNMutableNotificationContent(); content24.title = "Reminder"; content24.body = "\(activity.title) is tomorrow!"; content24.sound = .default
-                let date24 = activity.date.addingTimeInterval(-86400)
-                if date24 > Date() {
-                    let comps = Calendar.current.dateComponents([.year,.month,.day,.hour,.minute], from: date24)
-                    center.add(UNNotificationRequest(identifier: "\(activity.id)_24", content: content24, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
-                }
-                let content1 = UNMutableNotificationContent(); content1.title = "Ready?"; content1.body = "\(activity.title) in 1 hour!"; content1.sound = .default
-                let date1 = activity.date.addingTimeInterval(-3600)
-                if date1 > Date() {
-                    let comps = Calendar.current.dateComponents([.year,.month,.day,.hour,.minute], from: date1)
-                    center.add(UNNotificationRequest(identifier: "\(activity.id)_1", content: content1, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+        let ids = ["\(activity.id)_24", "\(activity.id)_1"]
+        
+        // 1. PULIZIA AGGRESSIVA (Rimuove sia le future che quelle già arrivate nel centro notifiche)
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        center.removeDeliveredNotifications(withIdentifiers: ids)
+        
+        // Funzione helper interna per creare la richiesta
+        func addRequest(id: String, title: String, body: String, date: Date) {
+            if date > Date() {
+                let content = UNMutableNotificationContent()
+                content.title = title
+                content.body = body
+                content.sound = .default
+                content.userInfo = ["activityId": activity.id.uuidString] // ID per Deep Link
+                
+                let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+                let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+                
+                center.add(request) { error in
+                    if let error = error { print("Errore notifica: \(error.localizedDescription)") }
                 }
             }
         }
+        
+        // Notifica 24 ore prima
+        addRequest(id: ids[0], title: "Reminder: \(activity.title)", body: "Your activity is tomorrow!", date: activity.date.addingTimeInterval(-86400))
+        
+        // Notifica 1 ora prima
+        addRequest(id: ids[1], title: "Get Ready: \(activity.title)", body: "Starts in 1 hour!", date: activity.date.addingTimeInterval(-3600))
     }
-    static func cancelNotification(for activity: Activity) { UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["\(activity.id)_24", "\(activity.id)_1"]) }
+    
+    static func cancelNotification(for activity: Activity) {
+        let ids = ["\(activity.id)_24", "\(activity.id)_1"]
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
+    }
+    
+    // GESTIONE CLICK NOTIFICA (Deep Link)
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+        
+        if let activityIDString = userInfo["activityId"] as? String,
+           let uuid = UUID(uuidString: activityIDString) {
+            
+            print("Notifica cliccata per ID: \(uuid)")
+            
+            // *** FIX CRUCIALE: RITARDO DI 0.8 SECONDI ***
+            // Diamo tempo all'app di caricare la Home/Mappa completamente prima di aprire il dettaglio
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                ActivityManager.shared.openDetailFor(activityID: uuid)
+            }
+        }
+        completionHandler()
+    }
+    
+    // MOSTRA NOTIFICA ANCHE A APP APERTA
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
 }
 
 class ActivityManager: ObservableObject {
@@ -98,6 +152,11 @@ class ActivityManager: ObservableObject {
     @Published var joinedActivities: [Activity] = []
     @Published var createdActivities: [Activity] = []
     @Published var favoriteActivities: [UUID] = []
+    
+    // DEEP LINKING VARIABLES
+    @Published var selectedActivityFromNotification: Activity? = nil
+    @Published var showDetailFromNotification: Bool = false
+    
     static let userLocation = CLLocation(latitude: 40.8518, longitude: 14.2681)
     
     static let defaultActivities: [Activity] = [
@@ -110,6 +169,24 @@ class ActivityManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let decoded = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = decoded }
         if let data = UserDefaults.standard.data(forKey: "createdActivities"), let decoded = try? JSONDecoder().decode([Activity].self, from: data) { self.createdActivities = decoded }
         if let data = UserDefaults.standard.data(forKey: "favorites"), let decoded = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = decoded }
+        
+        // Attiva il delegate delle notifiche
+        _ = NotificationHelper.shared
+    }
+    
+    func openDetailFor(activityID: UUID) {
+        // Cerca l'attività tra tutte quelle disponibili
+        let found = joinedActivities.first { $0.id == activityID }
+            ?? createdActivities.first { $0.id == activityID }
+            ?? ActivityManager.defaultActivities.first { $0.id == activityID }
+        
+        if let act = found {
+            print("Apro dettaglio per: \(act.title)")
+            self.selectedActivityFromNotification = act
+            self.showDetailFromNotification = true
+        } else {
+            print("Attività non trovata per ID: \(activityID)")
+        }
     }
     
     func join(activity: Activity) { if !joinedActivities.contains(where: { $0.id == activity.id }) { joinedActivities.append(activity); saveJoined(); NotificationHelper.scheduleNotification(for: activity) } }
@@ -144,4 +221,3 @@ struct Validator { static func isValidEmail(_ e: String) -> Bool { NSPredicate(f
 struct CustomBackButton: View { @Environment(\.presentationMode) var presentationMode; var body: some View { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2) } } }
 struct DatiEvento { var titolo: String = ""; var tipo: String = ""; var descrizione: String = ""; var data: Date = Date(); var luogo: String = ""; var imageData: Data? = nil; var lat: Double? = nil; var lon: Double? = nil }
 class UserManager: ObservableObject { static let shared = UserManager(); @Published var currentUser: UserProfile; init() { if let data = UserDefaults.standard.data(forKey: "savedUser"), let decoded = try? JSONDecoder().decode(UserProfile.self, from: data) { self.currentUser = decoded } else { self.currentUser = UserProfile.testUser } }; func saveUser(_ user: UserProfile) { self.currentUser = user; if let encoded = try? JSONEncoder().encode(user) { UserDefaults.standard.set(encoded, forKey: "savedUser") } }; func deleteUser() { UserDefaults.standard.removeObject(forKey: "savedUser"); self.currentUser = UserProfile.testUser } }
-

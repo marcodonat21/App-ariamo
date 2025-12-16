@@ -6,9 +6,9 @@ struct ParticipantsListView: View {
     
     // Dati simulati
     let participants: [UserProfile] = [
-        UserProfile(name: "Mario", surname: "Rossi", age: 24, gender: "Man", bio: "Love football", motto: "Forza Napoli", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
-        UserProfile(name: "Lucia", surname: "Verdi", age: 22, gender: "Woman", bio: "Travel addict", motto: "Carpe Diem", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
-        UserProfile(name: "Luca", surname: "Bianchi", age: 28, gender: "Man", bio: "Tech & Gym", motto: "Push limits", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
+        UserProfile(name: "Marco", surname: "Donatore", age: 24, gender: "Man", bio: "Love football", motto: "Forza Napoli", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
+        UserProfile(name: "Erika", surname: "Cortese", age: 22, gender: "Woman", bio: "Travel addict", motto: "Carpe Diem", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
+        UserProfile(name: "Arianna", surname: "Trombaccia", age: 18, gender: "Man", bio: "Tech & Gym", motto: "Push limits", image: "person.fill", email: "", password: "", interests: [], shareLocation: false, notifications: false),
         UserManager.shared.currentUser
     ]
     
