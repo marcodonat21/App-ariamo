@@ -140,8 +140,11 @@ class ActivityManager: ObservableObject {
     
     private var isSaving = false
     
-    static let userLocation = CLLocation(latitude: 40.8518, longitude: 14.2681)
-    
+    // Sostituisci la vecchia userLocation statica con questa dinamica:
+        static var userLocation: CLLocation {
+            // Se c'è il GPS usa quello, altrimenti usa Napoli di default
+            return LocationManager.shared.userLocation ?? CLLocation(latitude: 40.8518, longitude: 14.2681)
+        }
     // TROVA QUESTA PARTE E SOSTITUISCILA COSÌ:
     static let defaultActivities: [Activity] = []
     // (Prima c'erano Maradona, Pizzeria ecc, ora li abbiamo cancellati)
