@@ -122,36 +122,34 @@ struct ActivityDetailView: View {
                                     Text(activityToShow.title).font(.title2).fontWeight(.heavy).foregroundColor(.themeText)
                                     
                                     // Conteggio Partecipanti (cliccabile se loggato)
-                                    if isLoggedIn {
-                                        NavigationLink(destination: ParticipantsListView(activityID: activityToShow.id)) {
-                                            HStack(spacing: 10) {
-                                                HStack(spacing: -10) {
-                                                    ForEach(0..<min(participants.count, 3), id: \.self) { _ in
-                                                        Circle().stroke(Color.themeCard, lineWidth: 2).background(Circle().fill(Color.gray.opacity(0.3))).overlay(Image(systemName: "person.fill").font(.caption).foregroundColor(.gray)).frame(width: 30, height: 30)
-                                                    }
-                                                    if participants.count > 3 {
-                                                        ZStack { Circle().stroke(Color.themeCard, lineWidth: 2); Circle().fill(Color.appGreen); Text("+\(participants.count - 3)").font(.caption2).bold().foregroundColor(.white) }.frame(width: 30, height: 30)
-                                                    }
-                                                }
-                                                Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined").font(.caption).foregroundColor(.themeSecondaryText)
-                                                Image(systemName: "chevron.right").font(.caption2).foregroundColor(.gray)
+                                    // Conteggio Partecipanti (non cliccabile)
+                                    HStack(spacing: 10) {
+                                        HStack(spacing: -10) {
+                                            ForEach(0..<min(participants.count, 3), id: \.self) { _ in
+                                                Circle()
+                                                    .stroke(Color.themeCard, lineWidth: 2)
+                                                    .background(Circle().fill(Color.gray.opacity(0.3)))
+                                                    .overlay(Image(systemName: "person.fill")
+                                                    .font(.caption)
+                                                    .foregroundColor(.gray))
+                                                    .frame(width: 30, height: 30)
                                             }
-                                            .padding(.top, 5)
-                                        }
-                                    } else {
-                                        HStack(spacing: 10) {
-                                            HStack(spacing: -10) {
-                                                ForEach(0..<min(participants.count, 3), id: \.self) { _ in
-                                                    Circle().stroke(Color.themeCard, lineWidth: 2).background(Circle().fill(Color.gray.opacity(0.3))).overlay(Image(systemName: "person.fill").font(.caption).foregroundColor(.gray)).frame(width: 30, height: 30)
+                                            if participants.count > 3 {
+                                                ZStack {
+                                                    Circle().stroke(Color.themeCard, lineWidth: 2)
+                                                    Circle().fill(Color.appGreen)
+                                                    Text("+\(participants.count - 3)")
+                                                        .font(.caption2).bold().foregroundColor(.white)
                                                 }
-                                                if participants.count > 3 {
-                                                    ZStack { Circle().stroke(Color.themeCard, lineWidth: 2); Circle().fill(Color.appGreen); Text("+\(participants.count - 3)").font(.caption2).bold().foregroundColor(.white) }.frame(width: 30, height: 30)
-                                                }
+                                                .frame(width: 30, height: 30)
                                             }
-                                            Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined").font(.caption).foregroundColor(.themeSecondaryText)
                                         }
-                                        .padding(.top, 5)
+                                        Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined")
+                                            .font(.caption)
+                                            .foregroundColor(.themeSecondaryText)
                                     }
+                                    .padding(.top, 5)
+
                                 }
                                 
                                 // Box Dettagli
