@@ -31,19 +31,7 @@ struct ProfileScreen: View {
                         }
                     }
                     .padding(.horizontal)
-                    
-                    // Preferenze (Sola lettura)
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Your current preferences")
-                            .font(.caption).foregroundColor(.gray).padding(.horizontal)
-                        
-                        HStack {
-                            PreferenceBadge(icon: "bell.fill", isActive: userManager.currentUser.notifications)
-                            PreferenceBadge(icon: "location.fill", isActive: userManager.currentUser.shareLocation)
-                        }
-                        .padding(.horizontal)
-                    }
-                    
+ 
                     Divider()
                     
                     // Tasto Logout
@@ -312,9 +300,6 @@ struct EditProfileView: View {
                             }
                         }
                         .padding(.vertical, 5)
-                        
-                        Toggle("Share Location", isOn: $user.shareLocation).toggleStyle(SwitchToggleStyle(tint: .appGreen))
-                        Toggle("Notifications", isOn: $user.notifications).toggleStyle(SwitchToggleStyle(tint: .appGreen))
                     }
                     
                     Section {
