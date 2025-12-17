@@ -138,6 +138,9 @@ class ActivityManager: ObservableObject {
     
     private var isSaving = false
     
+    // Cache per le immagini caricate
+    private var imageCache: [String: Data] = [:]
+    
     static var userLocation: CLLocation {
         return LocationManager.shared.userLocation ?? CLLocation(latitude: 40.8518, longitude: 14.2681)
     }
@@ -160,13 +163,22 @@ class ActivityManager: ObservableObject {
     func fetchActivities() async {
         do {
             let dtos: [ActivityDTO] = try await client.from("activities").select().execute().value
-            let activities = dtos.map { $0.toActivity() }
+            
+            // Converte le DTO in Activity in modo asincrono
+            var activities: [Activity] = []
+            for dto in dtos {
+                let activity = await dto.toActivity()
+                activities.append(activity)
+            }
+            
             DispatchQueue.main.async {
                 self.allActivities = activities
                 let myId = UserManager.shared.currentUser.id
                 self.createdActivities = activities.filter { $0.creatorId == myId }
             }
-        } catch { print("❌ Fetch error: \(error)") }
+        } catch {
+            print("❌ Fetch error: \(error)")
+        }
     }
     
     func fetchMyJoinedActivities() async {
@@ -292,6 +304,27 @@ class ActivityManager: ObservableObject {
         } catch { print("❌ Error fetching participants") }
     }
     
+    // CARICAMENTO ASINCRONO IMMAGINI
+    func loadImageAsync(from urlString: String) async -> Data? {
+        // Controlla cache
+        if let cachedData = imageCache[urlString] {
+            return cachedData
+        }
+        
+        // Scarica in modo asincrono
+        guard let url = URL(string: urlString) else { return nil }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            // Salva in cache
+            imageCache[urlString] = data
+            return data
+        } catch {
+            print("❌ Failed to load image from \(urlString): \(error)")
+            return nil
+        }
+    }
+    
     private func loadLocalData() {
         if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let dec = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = dec }
         if let data = UserDefaults.standard.data(forKey: "favorites"), let dec = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = dec }
@@ -309,7 +342,6 @@ class ActivityManager: ObservableObject {
     private func saveCreated() { if let enc = try? JSONEncoder().encode(createdActivities) { UserDefaults.standard.set(enc, forKey: "createdActivities") } }
     private func saveFavorites() { if let enc = try? JSONEncoder().encode(favoriteActivities) { UserDefaults.standard.set(enc, forKey: "favorites") } }
     
-    // Funzione per pulire i dati utente al logout
     func clearUserData() {
         joinedActivities.removeAll()
         createdActivities.removeAll()
@@ -324,12 +356,34 @@ class ActivityManager: ObservableObject {
 
 struct ActivityDTO: Codable {
     let id: UUID; let title: String; let category: String; let image_url: String?; let image_name: String; let description: String; let date: Double; let location_name: String; let latitude: Double; let longitude: Double; let creator_id: UUID?
+    
     init(from act: Activity, creatorIdOverride: UUID? = nil) {
         id = act.id; title = act.title; category = act.category; image_url = act.imageURL; image_name = act.imageName; description = act.description; date = act.date.timeIntervalSince1970; location_name = act.locationName; latitude = act.latitude; longitude = act.longitude; creator_id = creatorIdOverride ?? act.creatorId
     }
-    func toActivity() -> Activity {
-        var d: Data? = nil; if let u = image_url, let url = URL(string: u) { d = try? Data(contentsOf: url) }
-        return Activity(id: id, title: title, category: category, imageName: image_name, imageData: d, imageURL: image_url, color: .appGreen, description: description, date: Date(timeIntervalSince1970: date), locationName: location_name, lat: latitude, lon: longitude, creatorId: creator_id ?? UUID())
+    
+    // ✅ VERSIONE ASINCRONA (NO PIÙ BLOCKING)
+    func toActivity() async -> Activity {
+        var imageData: Data? = nil
+        
+        if let urlString = image_url {
+            imageData = await ActivityManager.shared.loadImageAsync(from: urlString)
+        }
+        
+        return Activity(
+            id: id,
+            title: title,
+            category: category,
+            imageName: image_name,
+            imageData: imageData,
+            imageURL: image_url,
+            color: .appGreen,
+            description: description,
+            date: Date(timeIntervalSince1970: date),
+            locationName: location_name,
+            lat: latitude,
+            lon: longitude,
+            creatorId: creator_id ?? UUID()
+        )
     }
 }
 
@@ -355,7 +409,6 @@ class UserManager: ObservableObject {
     
     @Published var currentUser: UserProfile {
         didSet {
-            // FIX MEMORIA: Aggiorna isLoggedIn appena cambia l'utente
             isLoggedIn = !currentUser.email.isEmpty
             saveToStorage(currentUser)
         }
@@ -386,8 +439,6 @@ class UserManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "savedUser")
         self.currentUser = UserProfile.empty
         self.isLoggedIn = false
-        
-        // Puliamo anche i dati delle attività dell'utente
         ActivityManager.shared.clearUserData()
     }
 }

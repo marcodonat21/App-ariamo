@@ -24,7 +24,7 @@ struct LoginScreen: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 30) {
                        
-                        // TASTO INDIETRO (MODIFICATO CON STILE TONDINO BIANCO)
+                        // TASTO INDIETRO
                         HStack {
                             Button(action: { presentationMode.wrappedValue.dismiss() }) {
                                 Image(systemName: "chevron.left")
@@ -61,6 +61,7 @@ struct LoginScreen: View {
                             else {
                                 var currentUser = UserManager.shared.currentUser
                                 currentUser.email = email
+                                currentUser.password = password
                                 UserManager.shared.saveUser(currentUser)
                                 withAnimation { isLoggedIn = true }
                             }
@@ -100,7 +101,7 @@ struct LoginScreen: View {
         }
     }
     
-    // --- FUNZIONE PER FACE ID / TOUCH ID ---
+    // --- FUNZIONE PER FACE ID / TOUCH ID (FIXED) ---
     func authenticateWithBiometrics() {
         let context = LAContext()
         var error: NSError?
@@ -111,7 +112,33 @@ struct LoginScreen: View {
             context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
                 DispatchQueue.main.async {
                     if success {
-                        withAnimation { isLoggedIn = true }
+                        // ✅ FIX: Carica l'utente salvato o crea uno di default
+                        let savedUser = UserManager.shared.currentUser
+                        
+                        if savedUser.email.isEmpty {
+                            // Se non c'è un utente salvato, creane uno di default
+                            var faceIDUser = UserProfile(
+                                id: UUID(),
+                                name: "Face ID",
+                                surname: "User",
+                                age: 18,
+                                gender: "Prefer not to say",
+                                bio: "Authenticated with Face ID",
+                                motto: "",
+                                image: "faceid",
+                                email: "faceid@user.com",
+                                password: "",
+                                interests: [],
+                                shareLocation: true,
+                                notifications: true
+                            )
+                            UserManager.shared.saveUser(faceIDUser)
+                        }
+                        
+                        // Login completato
+                        withAnimation {
+                            isLoggedIn = true
+                        }
                     } else {
                         if let laError = authenticationError as? LAError {
                              print("Face ID error: \(laError.localizedDescription)")

@@ -58,70 +58,14 @@ struct AuthLandingScreen: View {
                                 .stroke(Color.appGreen, lineWidth: 2)
                         )
                         .cornerRadius(30)
-                    
                 }
                 .padding(.horizontal, 40)
-                
-                // SOCIAL LOGIN SECTION
-                /*VStack(spacing: 15) {
-                    Text("or log in with")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundColor(.gray)
-                    
-                    HStack(spacing: 20) {
-                        // APPLE LOGIN BUTTON
-                        Button(action: {
-                            performSocialLogin(provider: "Apple")
-                        }) {
-                            SocialButtonSmall(icon: "applelogo")
-                        }
-                        
-                        // GOOGLE LOGIN BUTTON
-                        Button(action: {
-                            performSocialLogin(provider: "Google")
-                        }) {
-                            SocialButtonSmall(icon: "g.circle.fill")
-                        }
-                    }
-                }*/
-                //.padding(.top, 200)
-                .padding(.bottom, 300)
+                .padding(.bottom, 200)
             }
         }
         .navigationBarHidden(true)
     }
-    
-    /*// --- FUNZIONE PER SIMULARE IL LOGIN SOCIAL ---
-    func performSocialLogin(provider: String) {
-        // 1. Simuliamo un ritardo di rete (opzionale, per realismo)
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        
-        // 2. Creiamo un utente fittizio basato sul provider
-        var socialUser = UserProfile.testUser
-        
-        if provider == "Apple" {
-            socialUser.name = "Apple"
-            socialUser.surname = "User"
-            socialUser.email = "user@icloud.com"
-            socialUser.bio = "Logged in via Apple ID"
-        } else {
-            socialUser.name = "Google"
-            socialUser.surname = "User"
-            socialUser.email = "user@gmail.com"
-            socialUser.bio = "Logged in via Google"
-        }
-        
-        // 3. Salviamo l'utente nel database locale
-        UserManager.shared.saveUser(socialUser)
-        
-        // 4. Entriamo nell'app
-        withAnimation {
-            isLoggedIn = true
-        }
-    }*/
 }
-     
 
 #Preview {
     AuthLandingScreen(isLoggedIn: .constant(false))
