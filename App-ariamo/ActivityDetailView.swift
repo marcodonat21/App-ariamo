@@ -6,18 +6,30 @@ struct ActivityDetailView: View {
     let initialActivity: Activity
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var manager = ActivityManager.shared
+    @ObservedObject var userManager = UserManager.shared
+    
+    // --- GUEST ACCESS CALLBACK ---
+    // Questa closure serve per dire alla ContentView di aprire il login con il contesto giusto
+    var onLoginRequest: ((AuthContext) -> Void)?
     
     // --- POPUP STATES ---
-    @State private var showSuccess = false          // Join
-    @State private var showLeaveSuccess = false     // Leave
-    @State private var showDeleteSuccess = false    // Delete
-    @State private var showFavoriteSuccess = false  // <--- NUOVO: Favorite
+    @State private var showSuccess = false
+    @State private var showLeaveSuccess = false
+    @State private var showDeleteSuccess = false
+    @State private var showFavoriteSuccess = false
     
     @State private var activeAlert: ActivityAlert?
     @State private var showEditView = false
-    @State private var showParticipantsList = false
     
-    init(activity: Activity) { self.initialActivity = activity }
+    // Controllo se l'utente è loggato
+    var isLoggedIn: Bool {
+        return !userManager.currentUser.email.isEmpty
+    }
+    
+    init(activity: Activity, onLoginRequest: ((AuthContext) -> Void)? = nil) {
+        self.initialActivity = activity
+        self.onLoginRequest = onLoginRequest
+    }
     
     var activityToShow: Activity {
         if let updated = manager.createdActivities.first(where: { $0.id == initialActivity.id }) { return updated }
@@ -28,12 +40,34 @@ struct ActivityDetailView: View {
     var participants: [ParticipantDTO] { return manager.participantsCache[activityToShow.id] ?? [] }
     
     var isJoined: Bool {
-        let myID = UserManager.shared.currentUser.id
+        guard isLoggedIn else { return false }
+        let myID = userManager.currentUser.id
         return manager.isJoined(activity: activityToShow) || participants.contains { $0.user_id == myID }
     }
     
-    var isCreator: Bool { manager.isCreator(activity: activityToShow) }
-    var isFavorite: Bool { manager.isFavorite(activity: activityToShow) }
+    var isCreator: Bool {
+        guard isLoggedIn else { return false }
+        return manager.isCreator(activity: activityToShow)
+    }
+    
+    var isFavorite: Bool {
+        guard isLoggedIn else { return false }
+        return manager.isFavorite(activity: activityToShow)
+    }
+    
+    // Luogo approssimativo per guest (area di 2km)
+    var approximateLocation: String {
+        // Estrae la città/area generale dall'indirizzo completo
+        let components = activityToShow.locationName.components(separatedBy: ",")
+        
+        // Se c'è una virgola, prendiamo solo la parte generale (es. "Via Roma, Napoli" -> "Napoli")
+        if components.count > 1 {
+            return components.last?.trimmingCharacters(in: .whitespaces) ?? "General Area"
+        }
+        
+        // Altrimenti mostriamo solo "Area" generica
+        return "Within 2km of this area"
+    }
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -46,18 +80,21 @@ struct ActivityDetailView: View {
                         Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                     }
                     Spacer(); Text("Details").font(.headline).foregroundColor(.themeText); Spacer()
+                    
                     if isCreator {
-                        Button(action: { showEditView = true }) { Image(systemName: "pencil").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2) }
+                        Button(action: { showEditView = true }) {
+                            Image(systemName: "pencil").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        }
                     } else { Color.clear.frame(width: 44, height: 44) }
-                }.padding(.horizontal, 20).padding(.top, 60).padding(.bottom, 15).background(Color.themeBackground)
+                }
+                .padding(.horizontal, 20).padding(.top, 60).padding(.bottom, 15).background(Color.themeBackground)
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         
-                        // CARD UNICA
+                        // CARD PRINCIPALE
                         VStack(spacing: 0) {
-                            
-                            // IMMAGINE
+                            // Immagine Attività
                             GeometryReader { geo in
                                 if let data = activityToShow.imageData, let uiImage = UIImage(data: data) {
                                     Image(uiImage: uiImage).resizable().aspectRatio(contentMode: .fill).frame(width: geo.size.width, height: 250).clipped()
@@ -68,122 +105,131 @@ struct ActivityDetailView: View {
                                 }
                             }.frame(height: 250)
                             
-                            // INFO
                             VStack(alignment: .leading, spacing: 20) {
-                                
-                                // TITOLO E CUORE
+                                // Titolo e Preferiti
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text(activityToShow.category.uppercased()).font(.caption).fontWeight(.bold).foregroundColor(activityToShow.color).padding(.horizontal, 10).padding(.vertical, 5).background(activityToShow.color.opacity(0.1)).cornerRadius(8)
                                         Spacer()
                                         
-                                        // TASTO CUORE (MODIFICATO PER IL POPUP)
                                         Button(action: {
-                                            manager.toggleFavorite(activity: activityToShow)
-                                            // Se dopo il click è diventato preferito, mostra il popup
-                                            if manager.isFavorite(activity: activityToShow) {
-                                                withAnimation { showFavoriteSuccess = true }
+                                            if isLoggedIn {
+                                                manager.toggleFavorite(activity: activityToShow)
+                                                if manager.isFavorite(activity: activityToShow) {
+                                                    withAnimation { showFavoriteSuccess = true }
+                                                }
+                                            } else {
+                                                // CHIEDE LOGIN PER PREFERITI
+                                                onLoginRequest?(.joinActivity(activityToShow))
                                             }
                                         }) {
                                             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                                                .font(.title2)
-                                                .foregroundColor(isFavorite ? .red : .gray)
-                                                .padding(8)
-                                                .background(Color.themeBackground)
-                                                .clipShape(Circle())
+                                                .font(.title2).foregroundColor(isFavorite ? .red : .gray)
+                                                .padding(8).background(Color.themeBackground).clipShape(Circle())
                                         }
                                     }
-                                    Text(activityToShow.title).font(.title2).fontWeight(.heavy).foregroundColor(.themeText).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                                    Text(activityToShow.title).font(.title2).fontWeight(.heavy).foregroundColor(.themeText)
                                     
-                                    // --- LISTA PARTECIPANTI ---
-                                    Button(action: { showParticipantsList = true }) {
-                                        HStack(spacing: 10) {
-                                            HStack(spacing: -10) {
-                                                ForEach(0..<min(participants.count, 3), id: \.self) { _ in
-                                                    Circle().stroke(Color.themeCard, lineWidth: 2).background(Circle().fill(Color.gray.opacity(0.3))).overlay(Image(systemName: "person.fill").font(.caption).foregroundColor(.gray)).frame(width: 30, height: 30)
-                                                }
-                                                if participants.count > 3 {
-                                                    ZStack { Circle().stroke(Color.themeCard, lineWidth: 2); Circle().fill(Color.appGreen); Text("+\(participants.count - 3)").font(.caption2).bold().foregroundColor(.white) }.frame(width: 30, height: 30)
-                                                }
+                                    // Conteggio Partecipanti (NON cliccabile)
+                                    HStack(spacing: 10) {
+                                        HStack(spacing: -10) {
+                                            ForEach(0..<min(participants.count, 3), id: \.self) { _ in
+                                                Circle().stroke(Color.themeCard, lineWidth: 2).background(Circle().fill(Color.gray.opacity(0.3))).overlay(Image(systemName: "person.fill").font(.caption).foregroundColor(.gray)).frame(width: 30, height: 30)
                                             }
-                                            Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined").font(.caption).foregroundColor(.themeSecondaryText)
-                                            Image(systemName: "chevron.right").font(.caption).foregroundColor(.gray)
+                                            if participants.count > 3 {
+                                                ZStack { Circle().stroke(Color.themeCard, lineWidth: 2); Circle().fill(Color.appGreen); Text("+\(participants.count - 3)").font(.caption2).bold().foregroundColor(.white) }.frame(width: 30, height: 30)
+                                            }
                                         }
-                                        .padding(.top, 5)
+                                        Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined").font(.caption).foregroundColor(.themeSecondaryText)
                                     }
+                                    .padding(.top, 5)
                                 }
                                 
-                                // DETTAGLI
-                                VStack(spacing: 0) {
-                                    DetailRow(icon: "calendar", title: "Date", value: activityToShow.date.formatted(date: .long, time: .omitted))
-                                    Divider().padding(.leading, 50)
-                                    DetailRow(icon: "clock", title: "Time", value: activityToShow.date.formatted(date: .omitted, time: .shortened))
-                                    Divider().padding(.leading, 50)
-                                    DetailRow(icon: "mappin.and.ellipse", title: "Location", value: activityToShow.locationName)
-                                }.padding().background(Color.themeBackground).cornerRadius(15)
+                                // Box Dettagli - MOSTRA TUTTO SOLO SE LOGGATO
+                                if isLoggedIn {
+                                    VStack(spacing: 0) {
+                                        DetailRow(icon: "calendar", title: "Date", value: activityToShow.date.formatted(date: .long, time: .omitted))
+                                        Divider().padding(.leading, 50)
+                                        DetailRow(icon: "clock", title: "Time", value: activityToShow.date.formatted(date: .omitted, time: .shortened))
+                                        Divider().padding(.leading, 50)
+                                        DetailRow(icon: "mappin.and.ellipse", title: "Location", value: activityToShow.locationName)
+                                    }.padding().background(Color.themeBackground).cornerRadius(15)
+                                } else {
+                                    // GUEST: Mostra solo area approssimativa
+                                    VStack(spacing: 0) {
+                                        DetailRow(icon: "mappin.and.ellipse", title: "Area", value: approximateLocation)
+                                    }.padding().background(Color.themeBackground).cornerRadius(15)
+                                    
+                                    // Messaggio per guest
+                                    HStack {
+                                        Image(systemName: "lock.fill").foregroundColor(.appGreen).font(.caption)
+                                        Text("Sign in to see exact date, time and location").font(.caption).foregroundColor(.themeSecondaryText)
+                                    }
+                                    .padding(.horizontal, 15)
+                                    .padding(.vertical, 10)
+                                    .background(Color.appGreen.opacity(0.1))
+                                    .cornerRadius(10)
+                                }
                                 
-                                VStack(alignment: .leading, spacing: 10) { Text("About").font(.headline).foregroundColor(.themeText); Text(activityToShow.description).font(.body).foregroundColor(.themeSecondaryText).lineSpacing(4) }
+                                // Bio Attività
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("About").font(.headline).foregroundColor(.themeText)
+                                    Text(activityToShow.description).font(.body).foregroundColor(.themeSecondaryText).lineSpacing(4)
+                                }
                                 
-                                // BOTTONE JOIN / LEAVE
+                                // BOTTONE AZIONE (Join/Leave/Delete)
                                 Button(action: {
-                                    if isCreator { activeAlert = .delete }
-                                    else if isJoined { activeAlert = .leave }
-                                    else {
-                                        ActivityManager.shared.joinActivityOnline(activity: activityToShow)
-                                        withAnimation { showSuccess = true }
+                                    if isLoggedIn {
+                                        if isCreator { activeAlert = .delete }
+                                        else if isJoined { activeAlert = .leave }
+                                        else {
+                                            manager.joinActivityOnline(activity: activityToShow)
+                                            withAnimation { showSuccess = true }
+                                        }
+                                    } else {
+                                        // CHIEDE LOGIN PER JOIN
+                                        onLoginRequest?(.joinActivity(activityToShow))
                                     }
                                 }) {
-                                    Text(isCreator ? "Cancel Activity" : (isJoined ? "Leave Activity" : "Join Activity")).font(.headline).fontWeight(.bold).foregroundColor(.white).frame(maxWidth: .infinity).padding().frame(height: 55).background(isCreator || isJoined ? Color.red : Color.appGreen).cornerRadius(18).shadow(color: (isCreator || isJoined ? Color.red : Color.appGreen).opacity(0.3), radius: 8, y: 4)
+                                    Text(isCreator ? "Cancel Activity" : (isJoined ? "Leave Activity" : "Join Activity"))
+                                        .font(.headline).fontWeight(.bold).foregroundColor(.white).frame(maxWidth: .infinity).padding().frame(height: 55)
+                                        .background(isCreator || isJoined ? Color.red : Color.appGreen).cornerRadius(18)
+                                        .shadow(color: (isCreator || isJoined ? Color.red : Color.appGreen).opacity(0.3), radius: 8, y: 4)
                                 }
                             }.padding(20)
                         }
-                        .background(Color.themeCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 25))
+                        .background(Color.themeCard).clipShape(RoundedRectangle(cornerRadius: 25))
                         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
                         
                         Spacer().frame(height: 120)
                     }.padding(.horizontal, 25).padding(.top, 10)
                 }
-            }.ignoresSafeArea(.all, edges: .top)
+            }
             
             // --- OVERLAYS ---
             if showSuccess { SuccessOverlay(onClose: { showSuccess = false; presentationMode.wrappedValue.dismiss() }).zIndex(20) }
-            
             if showLeaveSuccess { LeaveSuccessOverlay(title: "Left", message: "You left the activity.", iconName: "arrow.uturn.left", color: .red, onClose: { showLeaveSuccess = false; presentationMode.wrappedValue.dismiss() }).zIndex(20) }
-            
             if showDeleteSuccess { LeaveSuccessOverlay(title: "Cancelled", message: "Activity deleted.", iconName: "trash", color: .red, onClose: { manager.delete(activity: activityToShow); showDeleteSuccess = false; presentationMode.wrappedValue.dismiss() }).zIndex(20) }
-            
-            // *** POPUP PREFERITI NUOVO ***
-            if showFavoriteSuccess {
-                LeaveSuccessOverlay(
-                    title: "Great!",
-                    message: "You added this activity to your favourites!",
-                    iconName: "heart.fill",
-                    color: .red,
-                    onClose: { withAnimation { showFavoriteSuccess = false } }
-                ).zIndex(20)
-            }
+            if showFavoriteSuccess { LeaveSuccessOverlay(title: "Great!", message: "Added to favourites!", iconName: "heart.fill", color: .red, onClose: { withAnimation { showFavoriteSuccess = false } }).zIndex(20) }
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showEditView) { EditActivityView(activity: activityToShow) }
-        .sheet(isPresented: $showParticipantsList) {
-            ParticipantsListView(activityID: activityToShow.id)
-        }
-        .onAppear { Task { await ActivityManager.shared.fetchParticipants(for: activityToShow.id) } }
+        .onAppear { Task { await manager.fetchParticipants(for: activityToShow.id) } }
         .alert(item: $activeAlert) { type in
             switch type {
             case .leave: return Alert(title: Text("Leave?"), message: Text("Sure?"), primaryButton: .destructive(Text("Leave")) {
-                ActivityManager.shared.leaveActivityOnline(activity: activityToShow)
+                manager.leaveActivityOnline(activity: activityToShow)
                 DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showLeaveSuccess=true}}
             }, secondaryButton: .cancel())
-            case .delete: return Alert(title: Text("Delete?"), message: Text("Sure?"), primaryButton: .destructive(Text("Delete")) { DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showDeleteSuccess=true}} }, secondaryButton: .cancel())
+            case .delete: return Alert(title: Text("Delete?"), message: Text("Sure?"), primaryButton: .destructive(Text("Delete")) {
+                DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showDeleteSuccess=true}}
+            }, secondaryButton: .cancel())
             }
         }
     }
 }
 
-// --- HELPERS ---
-
+// --- SUPPORTING VIEWS (DetailRow, SuccessOverlay, LeaveSuccessOverlay rimangono invariati) ---
 struct DetailRow: View {
     let icon: String; let title: String; let value: String
     var body: some View {
@@ -222,12 +268,5 @@ struct LeaveSuccessOverlay: View {
                 Button("OK") { onClose() }.padding().frame(maxWidth: .infinity).background(color).foregroundColor(.white).cornerRadius(15).padding(.horizontal)
             }.padding(30).background(Color.themeCard).cornerRadius(20).padding(40)
         }
-    }
-}
-
-// --- PREVIEW ---
-struct ActivityDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        ActivityDetailView(activity: Activity.testActivity)
     }
 }

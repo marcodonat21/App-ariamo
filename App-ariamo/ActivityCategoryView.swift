@@ -12,6 +12,9 @@ struct ActivityCategoryView: View {
     @StateObject private var filters = FilterSettings()
     @State private var showFilters = false
     
+    // Callback per richiedere il login quando necessario
+    var onLoginRequest: ((AuthContext) -> Void)?
+    
     // Logica di filtraggio
         var filteredActivities: [Activity] {
             // *** MODIFICA: Solo manager.allActivities (Database) ***
@@ -74,7 +77,7 @@ struct ActivityCategoryView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 15) {
                             ForEach(filteredActivities) { activity in
-                                NavigationLink(destination: ActivityDetailView(activity: activity)) {
+                                NavigationLink(destination: ActivityDetailView(activity: activity, onLoginRequest: onLoginRequest)) {
                                     DetailedActivityRow(activity: activity)
                                 }
                             }

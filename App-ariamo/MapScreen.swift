@@ -28,6 +28,33 @@ struct MapScreen: View {
     @State private var selectedLocation: MapLocation? = nil
     @State private var navigateToDetail = false
     
+    // Callback per richiedere il login quando necessario
+    var onLoginRequest: ((AuthContext) -> Void)?
+    
+    // Callback per mostrare creation wizard
+    var onCreateActivity: (() -> Void)?
+    
+    // Stato login
+    var isLoggedIn: Bool
+    
+    // Funzione per approssimare coordinate (offset casuale entro 1km per guest)
+    func approximateCoordinate(original: CLLocationCoordinate2D, activityId: UUID) -> CLLocationCoordinate2D {
+        guard !isLoggedIn else { return original }
+        
+        // Usa l'ID dell'attività come seed per avere offset consistente
+        let seed = Double(activityId.hashValue % 1000) / 1000.0
+        
+        // Offset casuale entro ~1km (0.009 gradi ≈ 1km)
+        let maxOffset = 0.001
+        let latOffset = (seed - 0.5) * 2 * maxOffset
+        let lonOffset = ((Double((activityId.hashValue / 1000) % 1000) / 1000.0) - 0.5) * 2 * maxOffset
+        
+        return CLLocationCoordinate2D(
+            latitude: original.latitude + latOffset,
+            longitude: original.longitude + lonOffset
+        )
+    }
+    
     // Calcolo dei Pin da mostrare
     var filteredLocations: [MapLocation] {
         let allActivities = manager.allActivities
@@ -35,10 +62,16 @@ struct MapScreen: View {
         let filteredActs = filters.apply(to: uniqueActivities)
         
         var locations = filteredActs.map { act in
-            MapLocation(
+            // Coordinate approssimate per guest, precise per logged
+            let coord = approximateCoordinate(
+                original: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude),
+                activityId: act.id
+            )
+            
+            return MapLocation(
                 id: act.id,
                 name: act.title,
-                coordinate: CLLocationCoordinate2D(latitude: act.latitude, longitude: act.longitude),
+                coordinate: coord,
                 imageName: act.imageName,
                 description: act.description,
                 imageData: act.imageData
@@ -52,7 +85,6 @@ struct MapScreen: View {
         return locations
     }
     
-    // Gestione selezione "Viva"
     var liveSelectedLocation: MapLocation? {
         guard let current = selectedLocation else { return nil }
         let found = manager.allActivities.first(where: { $0.id == current.id })
@@ -63,7 +95,6 @@ struct MapScreen: View {
         return nil
     }
     
-    // Costruzione della lista annotazioni
     var annotationItems: [MapLocation] {
         var items = filteredLocations
         if let userLoc = locationManager.userLocation {
@@ -74,14 +105,6 @@ struct MapScreen: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            
-            // Sfondo cliccabile per deselezionare
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    hideKeyboard()
-                    withAnimation { selectedLocation = nil }
-                }
             
             // MAPPA
             Map(coordinateRegion: $locationManager.region, annotationItems: annotationItems) { location in
@@ -95,7 +118,7 @@ struct MapScreen: View {
                 withAnimation { selectedLocation = nil }
             }
             
-            // --- AVVISO GPS NEGATO ---
+            // --- AVVISO GPS NEGATO (Solo se realmente negato) ---
             if locationManager.permissionDenied {
                 VStack {
                     HStack {
@@ -111,62 +134,74 @@ struct MapScreen: View {
                     .background(Color.red.opacity(0.8))
                     .cornerRadius(15)
                     .padding(.horizontal)
-                    .padding(.top, 110) // Avviso in basso per non coprire i tasti
+                    .padding(.top, 110)
                     Spacer()
                 }
             }
             
-            // --- UI SUPERIORE (FILTRI - GPS CENTRALE - SPAZIO VUOTO PER IL +) ---
+            // --- BOTTONI VERTICALI (in basso a destra, sopra search) ---
             VStack {
-                HStack {
-                    // 1. SINISTRA: BOTTONE FILTRI
-                    Button(action: { showFilters = true }) {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.appGreen)
-                            .padding(14)
-                            .background(Color.themeCard)
-                            .clipShape(Circle())
-                            .shadow(color: .appGreen.opacity(0.4), radius: 8, x: 0, y: 4)
-                            .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
-                    }
-                    
-                    Spacer()
-                    
-                    // 2. CENTRO: BOTTONE GPS (Visibile solo se permesso OK)
-                    if !locationManager.permissionDenied {
-                        Button(action: { locationManager.centerMapOnUser() }) {
-                            Image(systemName: "location.fill")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(14)
-                                // *** MODIFICA COLORE: Ora è BLU come il pallino ***
-                                .background(Color.blue)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                        }
-                    } else {
-                        Color.clear.frame(width: 44, height: 44)
-                    }
-                    
-                    Spacer()
-                    
-                    // 3. DESTRA: SPAZIO VUOTO (Qui sopra c'è il tuo bottone +)
-                    Color.clear
-                        .frame(width: 44, height: 44)
-                        .padding(14)
-                }
-                .padding(.horizontal, 20)
-                // *** MODIFICA POSIZIONE: Ridotto a 40 per alzarli e allinearli al + ***
-                .padding(.top, 40)
-                
                 Spacer()
+                
+                HStack {
+                    Spacer()
+                    
+                    VStack(spacing: 20) {
+                        // BOTTONE FILTRI
+                        if !isSearchActive {
+                            Button(action: { showFilters = true }) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.appGreen)
+                                    .padding(14)
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                            }
+                        }
+                        
+                        // BOTTONE + (CREATE)
+                        if !isSearchActive {
+                            Button(action: {
+                                if isLoggedIn {
+                                    onCreateActivity?()
+                                } else {
+                                    onLoginRequest?(.createActivity)
+                                }
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(14)
+                                    .background(Color.appGreen)
+                                    .clipShape(Circle())
+                                    .shadow(color: .appGreen.opacity(0.3), radius: 8, x: 0, y: 4)
+                            }
+                        }
+                        
+                        // BOTTONE GPS
+                        if !isSearchActive {
+                            if !locationManager.permissionDenied {
+                                Button(action: { locationManager.centerMapOnUser() }) {
+                                    Image(systemName: "location.fill")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(14)
+                                        .background(Color.blue)
+                                        .clipShape(Circle())
+                                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                                }
+                            }
+                        }
+                    }.padding(.bottom, 110)
+                    .padding(.trailing, 20)
+                                    }
             }
-            // -----------------------------------
             
-            // CARD DETTAGLIO
+            // CARD DETTAGLIO (Appare al click sul Pin)
             if let liveLoc = liveSelectedLocation {
                 MapLocationCard(location: liveLoc) {
+                    // Navigazione al dettaglio
                     navigateToDetail = true
                 } onClose: {
                     withAnimation { selectedLocation = nil }
@@ -175,6 +210,7 @@ struct MapScreen: View {
             }
         }
         .background(
+            // Link di navigazione nascosto
             NavigationLink(destination: destinationView, isActive: $navigateToDetail) { EmptyView() }
         )
         .navigationBarHidden(true)
@@ -183,28 +219,32 @@ struct MapScreen: View {
         }
     }
     
-    // --- HELPER VIEW BUILDER ---
     @ViewBuilder
     func annotationView(for location: MapLocation) -> some View {
         if location.name == "ME" {
             UserLocationPin(filters: filters, region: locationManager.region)
         } else {
-            MapPinView(location: location, manager: manager, selectedLocation: selectedLocation) {
-                withAnimation(.spring()) {
-                    hideKeyboard()
-                    isSearchActive = false
-                    selectedLocation = location
-                }
-            }
+            MapPinView(
+                location: location,
+                manager: manager,
+                selectedLocation: selectedLocation,
+                onTap: {
+                    withAnimation(.spring()) {
+                        hideKeyboard()
+                        isSearchActive = false
+                        selectedLocation = location
+                    }
+                },
+                isLoggedIn: isLoggedIn
+            )
         }
     }
     
     var destinationView: some View {
         if let loc = liveSelectedLocation {
             let found = manager.allActivities.first(where: { $0.id == loc.id })
-            
             if let act = found {
-                return AnyView(ActivityDetailView(activity: act))
+                return AnyView(ActivityDetailView(activity: act, onLoginRequest: onLoginRequest))
             }
         }
         return AnyView(EmptyView())
@@ -223,17 +263,11 @@ struct UserLocationPin: View {
     var body: some View {
         ZStack {
             if filters.enableDistanceFilter {
-                GeometryReader { geo in
-                    let pixelRadius = (filters.maxDistanceKm / 111.0) * (UIScreen.main.bounds.height / region.span.latitudeDelta)
-                    ZStack {
-                        Circle().fill(Color.blue.opacity(0.15))
-                            .frame(width: pixelRadius * 2, height: pixelRadius * 2)
-                        Circle().stroke(Color.blue.opacity(0.4), lineWidth: 1)
-                            .frame(width: pixelRadius * 2, height: pixelRadius * 2)
-                    }
-                    .position(x: 0, y: 0)
-                }
-                .frame(width: 0, height: 0)
+                let pixelRadius = (filters.maxDistanceKm / 111.0) * (UIScreen.main.bounds.height / region.span.latitudeDelta)
+                Circle().fill(Color.blue.opacity(0.15))
+                    .frame(width: pixelRadius * 2, height: pixelRadius * 2)
+                Circle().stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                    .frame(width: pixelRadius * 2, height: pixelRadius * 2)
             }
             ZStack {
                 Circle().fill(Color.white).frame(width: 24, height: 24).shadow(radius: 4)
@@ -247,47 +281,57 @@ struct UserLocationPin: View {
 // 4. PIN ATTIVITÀ
 struct MapPinView: View {
     let location: MapLocation
-    @ObservedObject var manager: ActivityManager
+    @ObservedObject var manager = ActivityManager.shared
     let selectedLocation: MapLocation?
     let onTap: () -> Void
+    var isLoggedIn: Bool = true  // Default logged
     
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 4) {
-                ZStack {
-                    let isJoined = manager.joinedActivities.contains(where: { $0.id == location.id })
-                    let isCreatedByMe = manager.createdActivities.contains(where: { $0.id == location.id })
-                    let isFavorite = manager.favoriteActivities.contains(location.id)
-                    
+            ZStack {
+                // Cerchio blu sfocato per guest (stile Airbnb)
+                if !isLoggedIn {
                     Circle()
-                        .fill(isJoined ? Color.appGreen : (isCreatedByMe ? Color.blue : Color.red))
-                        .frame(width: 40, height: 40)
-                        .shadow(radius: 4)
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    
-                    Image(systemName: "mappin")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                    
-                    if isCreatedByMe {
-                        Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption).padding(3).background(Circle().fill(Color.white)).offset(x: 14, y: -14)
-                    }
-                    if isFavorite {
-                        Image(systemName: "heart.fill").foregroundColor(.red).font(.caption).padding(3).background(Circle().fill(Color.white)).offset(x: -14, y: -14)
-                    }
+                        .fill(Color.blue.opacity(0.15))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 8)
                 }
                 
-                Text(location.name)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.white)
-                    .cornerRadius(8)
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                VStack(spacing: 4) {
+                    ZStack {
+                        let isJoined = manager.joinedActivities.contains(where: { $0.id == location.id })
+                        let isCreatedByMe = manager.createdActivities.contains(where: { $0.id == location.id })
+                        let isFavorite = manager.favoriteActivities.contains(location.id)
+                        
+                        Circle()
+                            .fill(isJoined ? Color.appGreen : (isCreatedByMe ? Color.blue : Color.red))
+                            .frame(width: 40, height: 40)
+                            .shadow(radius: 4)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        
+                        Image(systemName: "mappin")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        
+                        if isCreatedByMe {
+                            Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption).padding(3).background(Circle().fill(Color.white)).offset(x: 14, y: -14)
+                        }
+                        if isFavorite {
+                            Image(systemName: "heart.fill").foregroundColor(.red).font(.caption).padding(3).background(Circle().fill(Color.white)).offset(x: -14, y: -14)
+                        }
+                    }
+                    
+                    Text(location.name)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                }
+                .scaleEffect(selectedLocation?.id == location.id ? 1.3 : 1.0)
+                .animation(.spring(), value: selectedLocation?.id)
             }
-            .scaleEffect(selectedLocation?.id == location.id ? 1.3 : 1.0)
-            .animation(.spring(), value: selectedLocation?.id)
         }
     }
 }
@@ -318,7 +362,7 @@ struct MapLocationCard: View {
                 Image(systemName: "chevron.right").foregroundColor(.gray.opacity(0.5)).padding(.trailing, 20)
             }
             .padding(20)
-            .background(Color.themeCard)
+            .background(Color.white)
             .cornerRadius(25)
             .shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 5)
             .onTapGesture(perform: onTap)
@@ -330,5 +374,42 @@ struct MapLocationCard: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 120)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+// --- PREVIEW ---
+struct MapScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            // Preview per Utente Loggato
+            NavigationView {
+                MapScreen(
+                    searchText: .constant(""),
+                    isSearchActive: .constant(false),
+                    isLoggedIn: true
+                )
+            }
+            .previewDisplayName("Loggato")
+
+            // Preview per Ospite (Guest)
+            NavigationView {
+                MapScreen(
+                    searchText: .constant(""),
+                    isSearchActive: .constant(false),
+                    isLoggedIn: false
+                )
+            }
+            .previewDisplayName("Ospite (Guest)")
+            
+            // Preview in Modalità Ricerca
+            NavigationView {
+                MapScreen(
+                    searchText: .constant("Pizza"),
+                    isSearchActive: .constant(true),
+                    isLoggedIn: true
+                )
+            }
+            .previewDisplayName("Ricerca Attiva")
+        }
     }
 }

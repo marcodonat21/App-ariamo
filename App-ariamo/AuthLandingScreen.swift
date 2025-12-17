@@ -17,7 +17,7 @@ struct AuthLandingScreen: View {
                 Spacer()
                 
                 // Title
-                Text("app-ariamo")
+                Text("app.ariamo")
                     .font(.system(size: 40, weight: .heavy, design: .rounded))
                     .foregroundColor(.appGreen)
                     .padding(.bottom, 10)
@@ -58,11 +58,12 @@ struct AuthLandingScreen: View {
                                 .stroke(Color.appGreen, lineWidth: 2)
                         )
                         .cornerRadius(30)
+                    
                 }
                 .padding(.horizontal, 40)
                 
                 // SOCIAL LOGIN SECTION
-                VStack(spacing: 15) {
+                /*VStack(spacing: 15) {
                     Text("or log in with")
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.gray)
@@ -82,15 +83,15 @@ struct AuthLandingScreen: View {
                             SocialButtonSmall(icon: "g.circle.fill")
                         }
                     }
-                }
-                .padding(.top, 30)
-                .padding(.bottom, 50)
+                }*/
+                //.padding(.top, 200)
+                .padding(.bottom, 300)
             }
         }
         .navigationBarHidden(true)
     }
     
-    // --- FUNZIONE PER SIMULARE IL LOGIN SOCIAL ---
+    /*// --- FUNZIONE PER SIMULARE IL LOGIN SOCIAL ---
     func performSocialLogin(provider: String) {
         // 1. Simuliamo un ritardo di rete (opzionale, per realismo)
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -118,8 +119,9 @@ struct AuthLandingScreen: View {
         withAnimation {
             isLoggedIn = true
         }
-    }
+    }*/
 }
+     
 
 #Preview {
     AuthLandingScreen(isLoggedIn: .constant(false))

@@ -17,40 +17,42 @@ struct ActivityListScreen: View {
     @State private var searchText = ""
     @State private var isSearchActive = false
     
+    // Callback per richiedere il login quando necessario
+    var onLoginRequest: ((AuthContext) -> Void)?
+    
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.themeBackground.ignoresSafeArea()
-                
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        
-                        // Titolo
-                        Text("Explore Categories")
-                            .font(.system(.largeTitle, design: .rounded))
-                            .fontWeight(.bold)
-                            .foregroundColor(.themeText)
-                            .padding(.top, 20)
-                        
-                        // Griglia Categorie
-                        LazyVGrid(columns: columns, spacing: 20) {
-                            ForEach(categories, id: \.0) { category in
-                                NavigationLink(destination: ActivityCategoryView(
-                                    category: category.0,
-                                    searchText: $searchText,
-                                    isSearchActive: $isSearchActive
-                                )) {
-                                    CategoryCard(title: category.0, icon: category.1, color: category.2)
-                                }
+        ZStack {
+            Color.themeBackground.ignoresSafeArea()
+            
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
+                    
+                    // Titolo
+                    Text("Explore Categories")
+                        .font(.system(.largeTitle, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(.themeText)
+                        .padding(.top, 20)
+                    
+                    // Griglia Categorie
+                    LazyVGrid(columns: columns, spacing: 20) {
+                        ForEach(categories, id: \.0) { category in
+                            NavigationLink(destination: ActivityCategoryView(
+                                category: category.0,
+                                searchText: $searchText,
+                                isSearchActive: $isSearchActive,
+                                onLoginRequest: onLoginRequest
+                            )) {
+                                CategoryCard(title: category.0, icon: category.1, color: category.2)
                             }
                         }
                     }
-                    .padding(.horizontal, 25)
-                    .padding(.bottom, 100) // Spazio per la TabBar
                 }
+                .padding(.horizontal, 25)
+                .padding(.bottom, 100) // Spazio per la TabBar
             }
-            .navigationBarHidden(true)
         }
+        .navigationBarHidden(true)
     }
 }
 

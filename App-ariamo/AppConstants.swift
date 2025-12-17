@@ -100,7 +100,6 @@ class NotificationHelper: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) { completionHandler([.banner, .sound]) }
 }
 
-// --- DTO PARTECIPANTI ---
 struct ParticipantDTO: Codable, Identifiable {
     var id: Int?
     let activity_id: UUID
@@ -112,10 +111,9 @@ struct ParticipantDTO: Codable, Identifiable {
     let user_country: String?
 }
 
-// STRUCT PER AGGIORNAMENTO
 struct ParticipantUpdatePayload: Codable {
     let user_name: String
-    let user_image: String? // Aggiunto per aggiornare foto
+    let user_image: String?
     let user_bio: String
     let user_age: Int
     let user_country: String
@@ -140,14 +138,11 @@ class ActivityManager: ObservableObject {
     
     private var isSaving = false
     
-    // Sostituisci la vecchia userLocation statica con questa dinamica:
-        static var userLocation: CLLocation {
-            // Se c'è il GPS usa quello, altrimenti usa Napoli di default
-            return LocationManager.shared.userLocation ?? CLLocation(latitude: 40.8518, longitude: 14.2681)
-        }
-    // TROVA QUESTA PARTE E SOSTITUISCILA COSÌ:
+    static var userLocation: CLLocation {
+        return LocationManager.shared.userLocation ?? CLLocation(latitude: 40.8518, longitude: 14.2681)
+    }
+
     static let defaultActivities: [Activity] = []
-    // (Prima c'erano Maradona, Pizzeria ecc, ora li abbiamo cancellati)
     
     init() {
         self.client = SupabaseClient(
@@ -155,15 +150,12 @@ class ActivityManager: ObservableObject {
             supabaseKey: supabaseKey,
             options: .init(auth: .init(emitLocalSessionAsInitialSession: true))
         )
-        
         loadLocalData()
         Task {
             await fetchActivities()
             await fetchMyJoinedActivities()
         }
     }
-    
-    // --- SUPABASE ACTIONS ---
     
     func fetchActivities() async {
         do {
@@ -210,10 +202,8 @@ class ActivityManager: ObservableObject {
             let dto = ActivityDTO(from: finalAct, creatorIdOverride: creatorId)
             do {
                 try await client.from("activities").insert(dto).execute()
-                print("✅ Attività creata")
                 joinActivityOnline(activity: finalAct)
             } catch {
-                print("❌ DB error: \(error)")
                 DispatchQueue.main.async {
                     self.createdActivities.removeAll { $0.id == activity.id }
                     self.allActivities.removeAll { $0.id == activity.id }
@@ -252,83 +242,35 @@ class ActivityManager: ObservableObject {
         }
     }
 
-    // Sostituisci la vecchia joinActivityOnline con questa:
-        func joinActivityOnline(activity: Activity) {
-            // Se è un'attività di default (finta), unisciti solo localmente
-            if ActivityManager.defaultActivities.contains(where: { $0.id == activity.id }) {
-                DispatchQueue.main.async { self.join(activity: activity) }
-                return
-            }
-            
-            let user = UserManager.shared.currentUser
-            
-            Task {
-                // 1. Determina quale immagine usare (URL o Icona)
-                var finalUserImageString = user.image // Parte con il valore attuale (es. "person.fill" o un vecchio URL)
-                
-                // Se l'utente ha una foto in memoria (scelta in registrazione/profilo), CARICALA ORA
-                if let data = user.profileImageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
-                    let fileName = "avatar_\(user.id.uuidString).jpg"
-                    
-                    // Upload su Supabase
-                    try? await client.storage.from("images").upload(
-                        path: fileName,
-                        file: comp,
-                        options: FileOptions(contentType: "image/jpeg", upsert: true)
-                    )
-                    
-                    // Ottieni URL Pubblico
-                    if let url = try? client.storage.from("images").getPublicURL(path: fileName) {
-                        finalUserImageString = url.absoluteString // Ecco l'URL della foto vera!
-                    }
-                }
-                
-                // 2. Crea il partecipante con la stringa dell'immagine corretta (URL o Icona)
-                let p = ParticipantDTO(
-                    activity_id: activity.id,
-                    user_id: user.id,
-                    user_name: "\(user.name) \(user.surname)",
-                    user_image: finalUserImageString, // <--- QUI PASSA L'URL
-                    user_age: user.age,
-                    user_bio: user.bio,
-                    user_country: user.country
-                )
-                
-                do {
-                    try await client.from("participants").insert(p).execute()
-                    await fetchParticipants(for: activity.id)
-                    DispatchQueue.main.async { self.join(activity: activity) }
-                } catch {
-                    print("❌ Join error: \(error)")
-                }
-            }
+    func joinActivityOnline(activity: Activity) {
+        if ActivityManager.defaultActivities.contains(where: { $0.id == activity.id }) {
+            DispatchQueue.main.async { self.join(activity: activity) }
+            return
         }
-    
-    func refreshMyParticipantDetails() {
         let user = UserManager.shared.currentUser
         Task {
-            var userImageUrl = user.image
-            // Upload anche durante il refresh se necessario
+            var finalUserImageString = user.image
             if let data = user.profileImageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
                 let fileName = "avatar_\(user.id.uuidString).jpg"
                 try? await client.storage.from("images").upload(path: fileName, file: comp, options: FileOptions(contentType: "image/jpeg", upsert: true))
                 if let url = try? client.storage.from("images").getPublicURL(path: fileName) {
-                    userImageUrl = url.absoluteString
+                    finalUserImageString = url.absoluteString
                 }
             }
-            
-            let payload = ParticipantUpdatePayload(
+            let p = ParticipantDTO(
+                activity_id: activity.id,
+                user_id: user.id,
                 user_name: "\(user.name) \(user.surname)",
-                user_image: userImageUrl, // Aggiorna anche la foto
-                user_bio: user.bio,
+                user_image: finalUserImageString,
                 user_age: user.age,
+                user_bio: user.bio,
                 user_country: user.country
             )
-            
             do {
-                try await client.from("participants").update(payload).eq("user_id", value: user.id.uuidString).execute()
-                print("✅ Dati aggiornati!")
-            } catch { print("⚠️ Errore refresh: \(error)") }
+                try await client.from("participants").insert(p).execute()
+                await fetchParticipants(for: activity.id)
+                DispatchQueue.main.async { self.join(activity: activity) }
+            } catch { print("❌ Join error") }
         }
     }
     
@@ -339,7 +281,7 @@ class ActivityManager: ObservableObject {
                 try await client.from("participants").delete().eq("activity_id", value: activity.id.uuidString).eq("user_id", value: userId.uuidString).execute()
                 await fetchParticipants(for: activity.id)
                 DispatchQueue.main.async { self.leave(activity: activity) }
-            } catch { print("❌ Leave error: \(error)") }
+            } catch { print("❌ Leave error") }
         }
     }
 
@@ -350,7 +292,6 @@ class ActivityManager: ObservableObject {
         } catch { print("❌ Error fetching participants") }
     }
     
-    // Logica Locale
     private func loadLocalData() {
         if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let dec = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = dec }
         if let data = UserDefaults.standard.data(forKey: "favorites"), let dec = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = dec }
@@ -361,25 +302,31 @@ class ActivityManager: ObservableObject {
     func isFavorite(activity: Activity) -> Bool { favoriteActivities.contains(activity.id) }
     func isCreator(activity: Activity) -> Bool { return activity.creatorId == UserManager.shared.currentUser.id }
     func isJoined(activity: Activity) -> Bool { joinedActivities.contains(where: { $0.id == activity.id }) }
-    
     func openDetailFor(activityID: UUID) {
-        let found = allActivities.first { $0.id == activityID } ?? ActivityManager.defaultActivities.first { $0.id == activityID }
-        if let act = found { self.selectedActivityFromNotification = act; self.showDetailFromNotification = true }
+        if let found = allActivities.first(where: { $0.id == activityID }) { self.selectedActivityFromNotification = found; self.showDetailFromNotification = true }
     }
     private func saveJoined() { if let enc = try? JSONEncoder().encode(joinedActivities) { UserDefaults.standard.set(enc, forKey: "joinedActivities") } }
     private func saveCreated() { if let enc = try? JSONEncoder().encode(createdActivities) { UserDefaults.standard.set(enc, forKey: "createdActivities") } }
     private func saveFavorites() { if let enc = try? JSONEncoder().encode(favoriteActivities) { UserDefaults.standard.set(enc, forKey: "favorites") } }
+    
+    // Funzione per pulire i dati utente al logout
+    func clearUserData() {
+        joinedActivities.removeAll()
+        createdActivities.removeAll()
+        favoriteActivities.removeAll()
+        participantsCache.removeAll()
+        
+        UserDefaults.standard.removeObject(forKey: "joinedActivities")
+        UserDefaults.standard.removeObject(forKey: "createdActivities")
+        UserDefaults.standard.removeObject(forKey: "favorites")
+    }
 }
 
 struct ActivityDTO: Codable {
-    let id: UUID; let title: String; let category: String; let image_url: String?; let image_name: String; let description: String; let date: Double; let location_name: String; let latitude: Double; let longitude: Double
-    let creator_id: UUID?
-    
+    let id: UUID; let title: String; let category: String; let image_url: String?; let image_name: String; let description: String; let date: Double; let location_name: String; let latitude: Double; let longitude: Double; let creator_id: UUID?
     init(from act: Activity, creatorIdOverride: UUID? = nil) {
-        id = act.id; title = act.title; category = act.category; image_url = act.imageURL; image_name = act.imageName; description = act.description; date = act.date.timeIntervalSince1970; location_name = act.locationName; latitude = act.latitude; longitude = act.longitude
-        creator_id = creatorIdOverride ?? act.creatorId
+        id = act.id; title = act.title; category = act.category; image_url = act.imageURL; image_name = act.imageName; description = act.description; date = act.date.timeIntervalSince1970; location_name = act.locationName; latitude = act.latitude; longitude = act.longitude; creator_id = creatorIdOverride ?? act.creatorId
     }
-    
     func toActivity() -> Activity {
         var d: Data? = nil; if let u = image_url, let url = URL(string: u) { d = try? Data(contentsOf: url) }
         return Activity(id: id, title: title, category: category, imageName: image_name, imageData: d, imageURL: image_url, color: .appGreen, description: description, date: Date(timeIntervalSince1970: date), locationName: location_name, lat: latitude, lon: longitude, creatorId: creator_id ?? UUID())
@@ -387,29 +334,70 @@ struct ActivityDTO: Codable {
 }
 
 struct Activity: Identifiable, Hashable, Codable {
-    let id: UUID; let title: String; let category: String; let imageName: String; var imageData: Data?; var imageURL: String?; let latitude: Double; let longitude: Double; var description: String; var date: Date; var locationName: String
-    let creatorId: UUID
-    
+    let id: UUID; let title: String; let category: String; let imageName: String; var imageData: Data?; var imageURL: String?; let latitude: Double; let longitude: Double; var description: String; var date: Date; var locationName: String; let creatorId: UUID
     init(id: UUID = UUID(), title: String, category: String = "Sports", imageName: String, imageData: Data? = nil, imageURL: String? = nil, color: Color, description: String = "", date: Date = Date(), locationName: String = "Naples", lat: Double = 40.85, lon: Double = 14.26, creatorId: UUID = UUID()) {
-        self.id = id; self.title = title; self.category = category; self.imageName = imageName; self.imageData = imageData; self.imageURL = imageURL; self.description = description; self.date = date; self.locationName = locationName; self.latitude = lat; self.longitude = lon
-        self.creatorId = creatorId
+        self.id = id; self.title = title; self.category = category; self.imageName = imageName; self.imageData = imageData; self.imageURL = imageURL; self.description = description; self.date = date; self.locationName = locationName; self.latitude = lat; self.longitude = lon; self.creatorId = creatorId
     }
     static func == (lhs: Activity, rhs: Activity) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     var color: Color { .appGreen }
 }
 
-struct UserProfile: Identifiable, Codable { var id = UUID(); var name, surname: String; var age: Int; var gender, bio, motto, image: String; var profileImageData: Data? = nil; var email, password: String; var interests: Set<String>; var shareLocation, notifications: Bool; var country: String = "🇮🇹 Italy" }
-extension UserProfile { static let testUser = UserProfile(name: "App", surname: "Ariamoci", age: 25, gender: "Non-binary", bio: "Welcome!", motto: "Let's connect!", image: "person.crop.circle.fill", profileImageData: nil, email: "test@email.com", password: "Appariamoci2025!", interests: [], shareLocation: true, notifications: true, country: "🇮🇹 Italy") }
-class UserManager: ObservableObject { static let shared = UserManager(); @Published var currentUser: UserProfile; init() { if let d = UserDefaults.standard.data(forKey: "savedUser"), let dec = try? JSONDecoder().decode(UserProfile.self, from: d) { self.currentUser = dec } else { self.currentUser = UserProfile.testUser } }; func saveUser(_ u: UserProfile) { self.currentUser = u; if let enc = try? JSONEncoder().encode(u) { UserDefaults.standard.set(enc, forKey: "savedUser") } }; func deleteUser() { UserDefaults.standard.removeObject(forKey: "savedUser"); self.currentUser = UserProfile.testUser } }
-struct Validator { static func isValidEmail(_ e: String) -> Bool { NSPredicate(format:"SELF MATCHES %@", "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}").evaluate(with: e) }; static func isValidPassword(_ p: String) -> Bool { NSPredicate(format:"SELF MATCHES %@", "^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$").evaluate(with: p) } }
+struct UserProfile: Identifiable, Codable {
+    var id = UUID(); var name, surname: String; var age: Int; var gender, bio, motto, image: String; var profileImageData: Data? = nil; var email, password: String; var interests: Set<String>; var shareLocation, notifications: Bool; var country: String = "🇮🇹 Italy"
+    static var empty: UserProfile {
+        UserProfile(id: UUID(), name: "", surname: "", age: 18, gender: "Prefer not to say", bio: "", motto: "", image: "person.circle", email: "", password: "", interests: [], shareLocation: false, notifications: false)
+    }
+}
+
+class UserManager: ObservableObject {
+    static let shared = UserManager()
+    
+    @Published var currentUser: UserProfile {
+        didSet {
+            // FIX MEMORIA: Aggiorna isLoggedIn appena cambia l'utente
+            isLoggedIn = !currentUser.email.isEmpty
+            saveToStorage(currentUser)
+        }
+    }
+    
+    @Published var isLoggedIn: Bool = false
+    
+    init() {
+        if let d = UserDefaults.standard.data(forKey: "savedUser"),
+           let dec = try? JSONDecoder().decode(UserProfile.self, from: d) {
+            self.currentUser = dec
+            self.isLoggedIn = !dec.email.isEmpty
+        } else {
+            self.currentUser = UserProfile.empty
+            self.isLoggedIn = false
+        }
+    }
+    
+    func saveUser(_ u: UserProfile) {
+        self.currentUser = u
+    }
+    
+    private func saveToStorage(_ u: UserProfile) {
+        if let enc = try? JSONEncoder().encode(u) { UserDefaults.standard.set(enc, forKey: "savedUser") }
+    }
+    
+    func logout() {
+        UserDefaults.standard.removeObject(forKey: "savedUser")
+        self.currentUser = UserProfile.empty
+        self.isLoggedIn = false
+        
+        // Puliamo anche i dati delle attività dell'utente
+        ActivityManager.shared.clearUserData()
+    }
+}
+
+struct Validator {
+    static func isValidEmail(_ e: String) -> Bool { NSPredicate(format:"SELF MATCHES %@", "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}").evaluate(with: e) }
+    static func isValidPassword(_ p: String) -> Bool { p.count >= 8 }
+}
+
 struct CustomBackButton: View { @Environment(\.presentationMode) var pm; var body: some View { Button(action: { pm.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2) } } }
 struct DatiEvento { var titolo, tipo, descrizione: String; var data: Date; var luogo: String; var imageData: Data?; var lat, lon: Double?; init() { titolo=""; tipo=""; descrizione=""; data=Date(); luogo=""; imageData=nil; lat=nil; lon=nil } }
 
-// --- EXTENSION PER PREVIEW ---
-extension Activity {
-    static let testActivity = Activity(id: UUID(), title: "Test", imageName: "star", color: .blue, creatorId: UUID())
-}
-extension ParticipantDTO {
-    static let testParticipant = ParticipantDTO(id: 1, activity_id: UUID(), user_id: UUID(), user_name: "Test", user_image: "person", user_age: 20, user_bio: "Bio", user_country: "Italy")
-}
+extension Activity { static let testActivity = Activity(id: UUID(), title: "Test", imageName: "star", color: .blue, creatorId: UUID()) }
