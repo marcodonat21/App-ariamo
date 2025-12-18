@@ -96,6 +96,7 @@ struct ActivityCategoryView: View {
 }
 
 // --- ROW DETTAGLIATA (Necessaria qui perché usata dalla lista) ---
+// --- ROW DETTAGLIATA (Necessaria qui perché usata dalla lista) ---
 struct DetailedActivityRow: View {
     let activity: Activity
     @ObservedObject var manager = ActivityManager.shared
@@ -136,13 +137,31 @@ struct DetailedActivityRow: View {
             
             // Icone Stato
             HStack(spacing: 8) {
+                // 1. STELLA (Creator) - AGGIUNTA!
+                if manager.isCreator(activity: activity) {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                }
+                
+                // 2. CUORE (Favorite)
                 if manager.isFavorite(activity: activity) {
-                    Image(systemName: "heart.fill").foregroundColor(.red).font(.caption)
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
                 }
+                
+                // 3. SPUNTA (Joined)
                 if manager.isJoined(activity: activity) {
-                    Image(systemName: "checkmark.circle.fill").foregroundColor(.appGreen).font(.caption)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.appGreen)
+                        .font(.caption)
                 }
-                Image(systemName: "chevron.right").foregroundColor(.gray).font(.caption)
+                
+                // 4. FRECCIA
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.gray)
+                    .font(.caption)
             }
         }
         .padding()

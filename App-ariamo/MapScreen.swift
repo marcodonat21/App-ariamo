@@ -193,7 +193,7 @@ struct MapScreen: View {
                                 }
                             }
                         }
-                    }.padding(.bottom, 110)
+                    }.padding(.bottom, 90)
                     .padding(.trailing, 20)
                                     }
             }

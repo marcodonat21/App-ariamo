@@ -206,7 +206,9 @@ struct ContentView: View {
                 Image(systemName: isSearchActive ? "xmark" : "magnifyingglass").font(.title2).foregroundColor(.white).frame(width: 60, height: 60).background(.ultraThinMaterial).background(isSearchActive ? Color.red.opacity(0.8) : Color.appGreen.opacity(0.8)).clipShape(Circle()).shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5).overlay(Circle().stroke(LinearGradient(colors: [.white.opacity(0.8), .white.opacity(0.2)], startPoint: .top, endPoint: .bottom), lineWidth: 1.5))
             }
         }
-        .padding(.horizontal).padding(.bottom, 30).transition(.move(edge: .bottom).combined(with: .opacity))
+        .padding(.horizontal)
+        .padding(.bottom, 5) // <--- MODIFICATO DA 30 A 5 PER ABBASSARE LA BARRA
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
     
     func hideKeyboard() { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
