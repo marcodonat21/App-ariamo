@@ -213,6 +213,9 @@ class ActivityManager: ObservableObject {
     private var isSaving = false
     private var imageCache: [String: Data] = [:]
     
+    // Timer per refresh automatico ogni 5 secondi
+    private var refreshTimer: Timer?
+    
     static var userLocation: CLLocation {
         return LocationManager.shared.userLocation ?? CLLocation(latitude: 40.8518, longitude: 14.2681)
     }
@@ -230,6 +233,33 @@ class ActivityManager: ObservableObject {
             await fetchActivities()
             await fetchMyJoinedActivities()
         }
+        
+        // Avvia il timer di refresh automatico ogni 5 secondi
+        startAutoRefresh()
+    }
+    
+    // MARK: - Auto Refresh Timer
+    func startAutoRefresh() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.fetchActivities()
+                // Refresh anche i partecipanti delle attività visualizzate
+                if let self = self {
+                    for activity in self.allActivities {
+                        await self.fetchParticipants(for: activity.id)
+                    }
+                }
+            }
+        }
+    }
+    
+    func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+    
+    deinit {
+        stopAutoRefresh()
     }
     
     func loadImageAsync(from urlString: String) async -> Data? {
@@ -255,6 +285,8 @@ class ActivityManager: ObservableObject {
                 if UserManager.shared.isLoggedIn {
                     let myId = UserManager.shared.currentUser.id
                     self.createdActivities = activities.filter { $0.creatorId == myId }
+                    self.saveCreated() // ✅ Salva le attività create
+                    print("✅ Fetched \(activities.count) activities, \(self.createdActivities.count) created by me")
                 }
             }
         } catch { print("❌ Fetch error: \(error)") }
@@ -277,16 +309,37 @@ class ActivityManager: ObservableObject {
         isSaving = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.isSaving = false }
         
+        let creatorId = UserManager.shared.currentUser.id
+        
+        // Creiamo una copia dell'attività con il creatorId corretto
+        var activityWithCreator = activity
+        activityWithCreator = Activity(
+            id: activity.id,
+            title: activity.title,
+            category: activity.category,
+            imageName: activity.imageName,
+            imageData: activity.imageData,
+            imageURL: activity.imageURL,
+            color: activity.color,
+            description: activity.description,
+            date: activity.date,
+            locationName: activity.locationName,
+            lat: activity.latitude,
+            lon: activity.longitude,
+            creatorId: creatorId // ✅ Impostiamo il creatorId corretto
+        )
+        
         DispatchQueue.main.async {
-            self.createdActivities.append(activity)
-            self.allActivities.append(activity)
+            self.createdActivities.append(activityWithCreator)
+            self.allActivities.append(activityWithCreator)
+            self.saveCreated()
+            print("✅ Activity created with creatorId: \(creatorId)")
         }
         
         Task {
-            var finalAct = activity
-            let creatorId = UserManager.shared.currentUser.id
-            if let data = activity.imageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
-                let fileName = "\(activity.id.uuidString).jpg"
+            var finalAct = activityWithCreator
+            if let data = activityWithCreator.imageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
+                let fileName = "\(activityWithCreator.id.uuidString).jpg"
                 try? await client.storage.from("images").upload(path: fileName, file: comp, options: FileOptions(contentType: "image/jpeg"))
                 let url = try? client.storage.from("images").getPublicURL(path: fileName)
                 finalAct.imageURL = url?.absoluteString; finalAct.imageData = nil
@@ -297,8 +350,8 @@ class ActivityManager: ObservableObject {
                 joinActivityOnline(activity: finalAct)
             } catch {
                 DispatchQueue.main.async {
-                    self.createdActivities.removeAll { $0.id == activity.id }
-                    self.allActivities.removeAll { $0.id == activity.id }
+                    self.createdActivities.removeAll { $0.id == activityWithCreator.id }
+                    self.allActivities.removeAll { $0.id == activityWithCreator.id }
                 }
             }
         }
@@ -400,7 +453,9 @@ class ActivityManager: ObservableObject {
     
     private func loadLocalData() {
         if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let dec = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = dec }
+        if let data = UserDefaults.standard.data(forKey: "createdActivities"), let dec = try? JSONDecoder().decode([Activity].self, from: data) { self.createdActivities = dec }
         if let data = UserDefaults.standard.data(forKey: "favorites"), let dec = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = dec }
+        print("📦 Loaded local data - created: \(createdActivities.count), joined: \(joinedActivities.count), favorites: \(favoriteActivities.count)")
     }
     
     func join(activity: Activity) {
@@ -423,7 +478,12 @@ class ActivityManager: ObservableObject {
     
     func toggleFavorite(activity: Activity) { if favoriteActivities.contains(activity.id) { favoriteActivities.removeAll { $0 == activity.id } } else { favoriteActivities.append(activity.id) }; saveFavorites() }
     func isFavorite(activity: Activity) -> Bool { favoriteActivities.contains(activity.id) }
-    func isCreator(activity: Activity) -> Bool { return activity.creatorId == UserManager.shared.currentUser.id }
+    func isCreator(activity: Activity) -> Bool {
+        let isInCreatedList = createdActivities.contains(where: { $0.id == activity.id })
+        let matchesUserId = activity.creatorId == UserManager.shared.currentUser.id
+        print("🔍 isCreator check - Activity: \(activity.title), isInCreatedList: \(isInCreatedList), matchesUserId: \(matchesUserId), creatorId: \(activity.creatorId), currentUserId: \(UserManager.shared.currentUser.id)")
+        return isInCreatedList || matchesUserId
+    }
     func isJoined(activity: Activity) -> Bool { joinedActivities.contains(where: { $0.id == activity.id }) }
     func openDetailFor(activityID: UUID) {
         if let found = allActivities.first(where: { $0.id == activityID }) { self.selectedActivityFromNotification = found; self.showDetailFromNotification = true }

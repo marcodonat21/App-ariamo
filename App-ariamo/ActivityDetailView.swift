@@ -45,8 +45,13 @@ struct ActivityDetailView: View {
     }
     
     var isCreator: Bool {
-        guard isLoggedIn else { return false }
-        return manager.isCreator(activity: activityToShow)
+        guard isLoggedIn else {
+            print("❌ Not logged in, can't be creator")
+            return false
+        }
+        let result = manager.isCreator(activity: activityToShow)
+        print("✏️ ActivityDetailView - isCreator: \(result) for activity: \(activityToShow.title)")
+        return result
     }
     
     var isFavorite: Bool {

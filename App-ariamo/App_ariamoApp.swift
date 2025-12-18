@@ -12,6 +12,7 @@ struct App_ariamo: App {
         WindowGroup {
             // Qui chiamiamo la tua vista radice che decide se mostrare Login o Home
             AppRootView()
+                .preferredColorScheme(.light)
         }
     }
 }
