@@ -111,12 +111,17 @@ struct ParticipantDTO: Codable, Identifiable {
     let user_country: String?
 }
 
-struct ParticipantUpdatePayload: Codable {
-    let user_name: String
-    let user_image: String?
-    let user_bio: String
-    let user_age: Int
-    let user_country: String
+struct ProfileTable: Codable {
+    let id: UUID
+    let name: String
+    let surname: String
+    let age: Int
+    let gender: String
+    let bio: String
+    let motto: String?
+    let country: String
+    let interests: [String]
+    let avatar_url: String?
 }
 
 class ActivityManager: ObservableObject {
@@ -125,20 +130,25 @@ class ActivityManager: ObservableObject {
     let supabaseURL = URL(string: "https://ywuvltphmcvtlswanmyj.supabase.co")!
     let supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3dXZsdHBobWN2dGxzd2FubXlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4ODk5MjEsImV4cCI6MjA4MTQ2NTkyMX0.mKW1vNu5EMKlxByD7HFLMcKcMr5G8vUiMc9dnfM5-2o"
     
-    private var client: SupabaseClient
+    var client: SupabaseClient
     
     @Published var allActivities: [Activity] = []
     @Published var joinedActivities: [Activity] = []
     @Published var createdActivities: [Activity] = []
     @Published var favoriteActivities: [UUID] = []
+    
+    var favoriteActivitiesList: [Activity] {
+        return allActivities.filter { favoriteActivities.contains($0.id) }
+    }
+    
     @Published var participantsCache: [UUID: [ParticipantDTO]] = [:]
     
     @Published var showDetailFromNotification: Bool = false
     @Published var selectedActivityFromNotification: Activity? = nil
     
-    private var isSaving = false
+    @Published var shouldShowSuccessAfterLogin: Bool = false
     
-    // Cache per le immagini caricate
+    private var isSaving = false
     private var imageCache: [String: Data] = [:]
     
     static var userLocation: CLLocation {
@@ -160,28 +170,36 @@ class ActivityManager: ObservableObject {
         }
     }
     
+    func loadImageAsync(from urlString: String) async -> Data? {
+        if let cachedData = imageCache[urlString] { return cachedData }
+        guard let url = URL(string: urlString) else { return nil }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            imageCache[urlString] = data
+            return data
+        } catch { return nil }
+    }
+    
     func fetchActivities() async {
         do {
             let dtos: [ActivityDTO] = try await client.from("activities").select().execute().value
-            
-            // Converte le DTO in Activity in modo asincrono
             var activities: [Activity] = []
             for dto in dtos {
                 let activity = await dto.toActivity()
                 activities.append(activity)
             }
-            
             DispatchQueue.main.async {
                 self.allActivities = activities
-                let myId = UserManager.shared.currentUser.id
-                self.createdActivities = activities.filter { $0.creatorId == myId }
+                if UserManager.shared.isLoggedIn {
+                    let myId = UserManager.shared.currentUser.id
+                    self.createdActivities = activities.filter { $0.creatorId == myId }
+                }
             }
-        } catch {
-            print("❌ Fetch error: \(error)")
-        }
+        } catch { print("❌ Fetch error: \(error)") }
     }
     
     func fetchMyJoinedActivities() async {
+        guard UserManager.shared.isLoggedIn else { return }
         let myId = UserManager.shared.currentUser.id
         do {
             let myParticipations: [ParticipantDTO] = try await client.from("participants").select().eq("user_id", value: myId.uuidString).execute().value
@@ -262,13 +280,14 @@ class ActivityManager: ObservableObject {
         let user = UserManager.shared.currentUser
         Task {
             var finalUserImageString = user.image
-            if let data = user.profileImageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
+            if user.image == "person.circle" || user.image.isEmpty, let data = user.profileImageData, let comp = UIImage(data: data)?.jpegData(compressionQuality: 0.5) {
                 let fileName = "avatar_\(user.id.uuidString).jpg"
                 try? await client.storage.from("images").upload(path: fileName, file: comp, options: FileOptions(contentType: "image/jpeg", upsert: true))
                 if let url = try? client.storage.from("images").getPublicURL(path: fileName) {
                     finalUserImageString = url.absoluteString
                 }
             }
+            
             let p = ParticipantDTO(
                 activity_id: activity.id,
                 user_id: user.id,
@@ -282,7 +301,7 @@ class ActivityManager: ObservableObject {
                 try await client.from("participants").insert(p).execute()
                 await fetchParticipants(for: activity.id)
                 DispatchQueue.main.async { self.join(activity: activity) }
-            } catch { print("❌ Join error") }
+            } catch { print("❌ Join error: \(error)") }
         }
     }
     
@@ -304,25 +323,14 @@ class ActivityManager: ObservableObject {
         } catch { print("❌ Error fetching participants") }
     }
     
-    // CARICAMENTO ASINCRONO IMMAGINI
-    func loadImageAsync(from urlString: String) async -> Data? {
-        // Controlla cache
-        if let cachedData = imageCache[urlString] {
-            return cachedData
-        }
-        
-        // Scarica in modo asincrono
-        guard let url = URL(string: urlString) else { return nil }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            // Salva in cache
-            imageCache[urlString] = data
-            return data
-        } catch {
-            print("❌ Failed to load image from \(urlString): \(error)")
-            return nil
-        }
+    func clearUserData() {
+        joinedActivities.removeAll()
+        createdActivities.removeAll()
+        favoriteActivities.removeAll()
+        participantsCache.removeAll()
+        UserDefaults.standard.removeObject(forKey: "joinedActivities")
+        UserDefaults.standard.removeObject(forKey: "createdActivities")
+        UserDefaults.standard.removeObject(forKey: "favorites")
     }
     
     private func loadLocalData() {
@@ -341,49 +349,19 @@ class ActivityManager: ObservableObject {
     private func saveJoined() { if let enc = try? JSONEncoder().encode(joinedActivities) { UserDefaults.standard.set(enc, forKey: "joinedActivities") } }
     private func saveCreated() { if let enc = try? JSONEncoder().encode(createdActivities) { UserDefaults.standard.set(enc, forKey: "createdActivities") } }
     private func saveFavorites() { if let enc = try? JSONEncoder().encode(favoriteActivities) { UserDefaults.standard.set(enc, forKey: "favorites") } }
-    
-    func clearUserData() {
-        joinedActivities.removeAll()
-        createdActivities.removeAll()
-        favoriteActivities.removeAll()
-        participantsCache.removeAll()
-        
-        UserDefaults.standard.removeObject(forKey: "joinedActivities")
-        UserDefaults.standard.removeObject(forKey: "createdActivities")
-        UserDefaults.standard.removeObject(forKey: "favorites")
-    }
 }
 
 struct ActivityDTO: Codable {
     let id: UUID; let title: String; let category: String; let image_url: String?; let image_name: String; let description: String; let date: Double; let location_name: String; let latitude: Double; let longitude: Double; let creator_id: UUID?
-    
     init(from act: Activity, creatorIdOverride: UUID? = nil) {
         id = act.id; title = act.title; category = act.category; image_url = act.imageURL; image_name = act.imageName; description = act.description; date = act.date.timeIntervalSince1970; location_name = act.locationName; latitude = act.latitude; longitude = act.longitude; creator_id = creatorIdOverride ?? act.creatorId
     }
-    
-    // ✅ VERSIONE ASINCRONA (NO PIÙ BLOCKING)
     func toActivity() async -> Activity {
         var imageData: Data? = nil
-        
         if let urlString = image_url {
             imageData = await ActivityManager.shared.loadImageAsync(from: urlString)
         }
-        
-        return Activity(
-            id: id,
-            title: title,
-            category: category,
-            imageName: image_name,
-            imageData: imageData,
-            imageURL: image_url,
-            color: .appGreen,
-            description: description,
-            date: Date(timeIntervalSince1970: date),
-            locationName: location_name,
-            lat: latitude,
-            lon: longitude,
-            creatorId: creator_id ?? UUID()
-        )
+        return Activity(id: id, title: title, category: category, imageName: image_name, imageData: imageData, imageURL: image_url, color: .appGreen, description: description, date: Date(timeIntervalSince1970: date), locationName: location_name, lat: latitude, lon: longitude, creatorId: creator_id ?? UUID())
     }
 }
 
@@ -407,40 +385,120 @@ struct UserProfile: Identifiable, Codable {
 class UserManager: ObservableObject {
     static let shared = UserManager()
     
-    @Published var currentUser: UserProfile {
-        didSet {
-            isLoggedIn = !currentUser.email.isEmpty
-            saveToStorage(currentUser)
-        }
-    }
-    
+    @Published var currentUser: UserProfile = .empty
     @Published var isLoggedIn: Bool = false
     
+    private let client = ActivityManager.shared.client
+    
     init() {
-        if let d = UserDefaults.standard.data(forKey: "savedUser"),
-           let dec = try? JSONDecoder().decode(UserProfile.self, from: d) {
-            self.currentUser = dec
-            self.isLoggedIn = !dec.email.isEmpty
-        } else {
-            self.currentUser = UserProfile.empty
-            self.isLoggedIn = false
+        checkSession()
+    }
+    
+    func checkSession() {
+        Task {
+            if let user = try? await client.auth.session.user {
+                await fetchProfile(userId: user.id)
+            } else {
+                await MainActor.run { self.isLoggedIn = false }
+            }
         }
     }
     
-    func saveUser(_ u: UserProfile) {
-        self.currentUser = u
+    func signUp(user: UserProfile) async throws {
+        let response = try await client.auth.signUp(email: user.email, password: user.password)
+        let userId = response.user.id
+        
+        var avatarUrl = user.image
+        if let data = user.profileImageData {
+            let fileName = "avatar_\(userId).jpg"
+            try? await client.storage.from("images").upload(path: fileName, file: data, options: FileOptions(contentType: "image/jpeg", upsert: true))
+            if let url = try? client.storage.from("images").getPublicURL(path: fileName) {
+                avatarUrl = url.absoluteString
+            }
+        }
+        
+        let profileTable = ProfileTable(
+            id: userId, name: user.name, surname: user.surname, age: user.age, gender: user.gender, bio: user.bio, motto: user.motto, country: user.country, interests: Array(user.interests), avatar_url: avatarUrl
+        )
+        
+        try await client.from("profiles").insert(profileTable).execute()
+        
+        var finalUser = user; finalUser.id = userId; finalUser.image = avatarUrl
+        await MainActor.run { self.currentUser = finalUser; self.isLoggedIn = true }
     }
     
-    private func saveToStorage(_ u: UserProfile) {
-        if let enc = try? JSONEncoder().encode(u) { UserDefaults.standard.set(enc, forKey: "savedUser") }
+    func login(email: String, password: String) async throws {
+        let response = try await client.auth.signIn(email: email, password: password)
+        await fetchProfile(userId: response.user.id)
+    }
+    
+    func fetchProfile(userId: UUID) async {
+        do {
+            let table: ProfileTable = try await client.from("profiles").select().eq("id", value: userId.uuidString).single().execute().value
+            var loadedUser = UserProfile(id: table.id, name: table.name, surname: table.surname, age: table.age, gender: table.gender, bio: table.bio, motto: table.motto ?? "", image: table.avatar_url ?? "person.circle", profileImageData: nil, email: "", password: "", interests: Set(table.interests), shareLocation: true, notifications: true, country: table.country)
+            if let sessionEmail = try? await client.auth.session.user.email { loadedUser.email = sessionEmail }
+            if let urlString = table.avatar_url, let url = URL(string: urlString) {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                loadedUser.profileImageData = data
+            }
+            await MainActor.run { self.currentUser = loadedUser; self.isLoggedIn = true }
+            await ActivityManager.shared.fetchMyJoinedActivities()
+        } catch { await MainActor.run { self.isLoggedIn = false } }
+    }
+    
+    func updateUserProfile(user: UserProfile) async throws {
+        var avatarUrl = user.image
+        if let data = user.profileImageData {
+            let fileName = "avatar_\(user.id.uuidString).jpg"
+            try? await client.storage.from("images").upload(path: fileName, file: data, options: FileOptions(contentType: "image/jpeg", upsert: true))
+            if let url = try? client.storage.from("images").getPublicURL(path: fileName) { avatarUrl = url.absoluteString + "?t=\(Int(Date().timeIntervalSince1970))" }
+        }
+        let profileTable = ProfileTable(id: user.id, name: user.name, surname: user.surname, age: user.age, gender: user.gender, bio: user.bio, motto: user.motto, country: user.country, interests: Array(user.interests), avatar_url: avatarUrl)
+        try await client.from("profiles").update(profileTable).eq("id", value: user.id.uuidString).execute()
+        var finalUser = user; finalUser.image = avatarUrl
+        await MainActor.run { self.currentUser = finalUser }
+    }
+    
+    func updateCredentials(email: String, password: String) async throws {
+        let attributes = UserAttributes(email: email, password: password)
+        try await client.auth.update(user: attributes)
+        await MainActor.run {
+            self.currentUser.email = email
+            self.currentUser.password = password
+        }
+    }
+    
+    func sendPasswordReset(email: String) async throws {
+        try await client.auth.resetPasswordForEmail(email)
+    }
+    
+    // --- NUOVA FUNZIONE PER CANCELLARE L'ACCOUNT ---
+    func deleteAccount() async throws {
+        let userId = currentUser.id.uuidString
+        
+        // 1. Cancella le attività create dall'utente
+        try await client.from("activities").delete().eq("creator_id", value: userId).execute()
+        
+        // 2. Rimuovi l'utente da tutte le attività a cui partecipa
+        try await client.from("participants").delete().eq("user_id", value: userId).execute()
+        
+        // 3. Cancella il profilo utente
+        try await client.from("profiles").delete().eq("id", value: userId).execute()
+        
+        // 4. Cancella l'utente dall'autenticazione (Richiede privilegi admin o una edge function, ma proviamo così)
+        // Nota: Supabase Auth non permette di cancellare l'utente direttamente dal client per sicurezza.
+        // Per ora, facciamo il logout e puliamo i dati locali. I dati nel DB sono comunque rimossi.
+        
+        logout()
     }
     
     func logout() {
-        UserDefaults.standard.removeObject(forKey: "savedUser")
-        self.currentUser = UserProfile.empty
-        self.isLoggedIn = false
-        ActivityManager.shared.clearUserData()
+        Task {
+            try? await client.auth.signOut()
+            await MainActor.run { self.currentUser = .empty; self.isLoggedIn = false; ActivityManager.shared.clearUserData() }
+        }
     }
+    func saveUser(_ u: UserProfile) { self.currentUser = u }
 }
 
 struct Validator {

@@ -15,6 +15,7 @@ struct ActivityDetailView: View {
     @State private var showLeaveSuccess = false
     @State private var showDeleteSuccess = false
     @State private var showFavoriteSuccess = false
+    @State private var showUnfavoriteSuccess = false
     @State private var showShareSheet = false
     
     @State private var activeAlert: ActivityAlert?
@@ -32,6 +33,7 @@ struct ActivityDetailView: View {
     var activityToShow: Activity {
         if let updated = manager.createdActivities.first(where: { $0.id == initialActivity.id }) { return updated }
         if let updated = manager.joinedActivities.first(where: { $0.id == initialActivity.id }) { return updated }
+        if let updated = manager.allActivities.first(where: { $0.id == initialActivity.id }) { return updated }
         return initialActivity
     }
     
@@ -55,9 +57,7 @@ struct ActivityDetailView: View {
     
     var approximateLocation: String {
         let components = activityToShow.locationName.components(separatedBy: ",")
-        if components.count > 1 {
-            return components.last?.trimmingCharacters(in: .whitespaces) ?? "General Area"
-        }
+        if components.count > 1 { return components.last?.trimmingCharacters(in: .whitespaces) ?? "General Area" }
         return "Within 2km of this area"
     }
     
@@ -66,7 +66,6 @@ struct ActivityDetailView: View {
             Color.themeBackground.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // HEADER
                 HStack {
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
                         Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
@@ -79,14 +78,11 @@ struct ActivityDetailView: View {
                         }
                     } else { Color.clear.frame(width: 44, height: 44) }
                 }
-                .padding(.horizontal, 20).padding(.top, 60).padding(.bottom, 15).background(Color.themeBackground)
+                .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 15).background(Color.themeBackground)
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        
-                        // CARD PRINCIPALE
                         VStack(spacing: 0) {
-                            // Immagine Attività
                             GeometryReader { geo in
                                 if let data = activityToShow.imageData, let uiImage = UIImage(data: data) {
                                     Image(uiImage: uiImage).resizable().aspectRatio(contentMode: .fill).frame(width: geo.size.width, height: 250).clipped()
@@ -98,227 +94,97 @@ struct ActivityDetailView: View {
                             }.frame(height: 250)
                             
                             VStack(alignment: .leading, spacing: 20) {
-                                // Titolo e Preferiti
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text(activityToShow.category.uppercased()).font(.caption).fontWeight(.bold).foregroundColor(activityToShow.color).padding(.horizontal, 10).padding(.vertical, 5).background(activityToShow.color.opacity(0.1)).cornerRadius(8)
                                         Spacer()
-                                        
                                         Button(action: {
                                             if isLoggedIn {
                                                 manager.toggleFavorite(activity: activityToShow)
-                                                if manager.isFavorite(activity: activityToShow) {
-                                                    withAnimation { showFavoriteSuccess = true }
-                                                }
+                                                if manager.isFavorite(activity: activityToShow) { withAnimation { showFavoriteSuccess = true } }
+                                                else { withAnimation { showUnfavoriteSuccess = true } }
                                             } else {
                                                 onLoginRequest?(.joinActivity(activityToShow))
                                             }
                                         }) {
-                                            Image(systemName: isFavorite ? "heart.fill" : "heart")
-                                                .font(.title2).foregroundColor(isFavorite ? .red : .gray)
-                                                .padding(8).background(Color.themeBackground).clipShape(Circle())
+                                            Image(systemName: isFavorite ? "heart.fill" : "heart").font(.title2).foregroundColor(isFavorite ? .red : .gray).padding(8).background(Color.themeBackground).clipShape(Circle())
                                         }
                                     }
                                     Text(activityToShow.title).font(.title2).fontWeight(.heavy).foregroundColor(.themeText)
-                                    
-                                    // Conteggio Partecipanti (cliccabile se loggato)
-                                    // Conteggio Partecipanti (non cliccabile)
                                     HStack(spacing: 10) {
                                         HStack(spacing: -10) {
-                                            ForEach(0..<min(participants.count, 3), id: \.self) { _ in
-                                                Circle()
-                                                    .stroke(Color.themeCard, lineWidth: 2)
-                                                    .background(Circle().fill(Color.gray.opacity(0.3)))
-                                                    .overlay(Image(systemName: "person.fill")
-                                                    .font(.caption)
-                                                    .foregroundColor(.gray))
-                                                    .frame(width: 30, height: 30)
-                                            }
-                                            if participants.count > 3 {
-                                                ZStack {
-                                                    Circle().stroke(Color.themeCard, lineWidth: 2)
-                                                    Circle().fill(Color.appGreen)
-                                                    Text("+\(participants.count - 3)")
-                                                        .font(.caption2).bold().foregroundColor(.white)
-                                                }
-                                                .frame(width: 30, height: 30)
-                                            }
+                                            ForEach(0..<min(participants.count, 3), id: \.self) { _ in Circle().stroke(Color.themeCard, lineWidth: 2).background(Circle().fill(Color.gray.opacity(0.3))).overlay(Image(systemName: "person.fill").font(.caption).foregroundColor(.gray)).frame(width: 30, height: 30) }
+                                            if participants.count > 3 { ZStack { Circle().stroke(Color.themeCard, lineWidth: 2); Circle().fill(Color.appGreen); Text("+\(participants.count - 3)").font(.caption2).bold().foregroundColor(.white) }.frame(width: 30, height: 30) }
                                         }
-                                        Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined")
-                                            .font(.caption)
-                                            .foregroundColor(.themeSecondaryText)
-                                    }
-                                    .padding(.top, 5)
-
+                                        Text(participants.isEmpty ? "Be first to join!" : "\(participants.count) people joined").font(.caption).foregroundColor(.themeSecondaryText)
+                                    }.padding(.top, 5)
                                 }
                                 
-                                // Box Dettagli
                                 if isLoggedIn {
                                     VStack(spacing: 0) {
                                         DetailRow(icon: "calendar", title: "Date", value: activityToShow.date.formatted(date: .long, time: .omitted))
                                         Divider().padding(.leading, 50)
                                         DetailRow(icon: "clock", title: "Time", value: activityToShow.date.formatted(date: .omitted, time: .shortened))
                                         Divider().padding(.leading, 50)
-                                        
-                                        // LOCATION CON TASTO "PORTAMI LÌ"
-                                        HStack(spacing: 15) {
-                                            ZStack { Circle().fill(Color.appGreen.opacity(0.1)).frame(width: 40, height: 40); Image(systemName: "mappin.and.ellipse").font(.system(size: 18)).foregroundColor(.appGreen) }
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Location").font(.caption).foregroundColor(.gray)
-                                                Text(activityToShow.locationName).font(.subheadline).fontWeight(.semibold).foregroundColor(.themeText).lineLimit(1)
-                                            }
-                                            Spacer()
-                                            
-                                            // TASTO "PORTAMI LÌ"
-                                            Button(action: {
-                                                openInMaps(latitude: activityToShow.latitude, longitude: activityToShow.longitude, name: activityToShow.title)
-                                            }) {
-                                                HStack(spacing: 5) {
-                                                    Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                                                        .foregroundColor(.appGreen)
-                                                    Text("Go")
-                                                        .font(.caption)
-                                                        .fontWeight(.bold)
-                                                        .foregroundColor(.appGreen)
-                                                }
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 6)
-                                                .background(Color.appGreen.opacity(0.1))
-                                                .cornerRadius(12)
-                                            }
-                                        }.padding(.vertical, 8).padding(.horizontal, 15)
+                                        DetailRow(icon: "mappin.and.ellipse", title: "Location", value: activityToShow.locationName)
                                     }.padding().background(Color.themeBackground).cornerRadius(15)
                                 } else {
-                                    VStack(spacing: 0) {
-                                        DetailRow(icon: "mappin.and.ellipse", title: "Area", value: approximateLocation)
-                                    }.padding().background(Color.themeBackground).cornerRadius(15)
-                                    
-                                    HStack {
-                                        Image(systemName: "lock.fill").foregroundColor(.appGreen).font(.caption)
-                                        Text("Sign in to see exact date, time and location").font(.caption).foregroundColor(.themeSecondaryText)
-                                    }
-                                    .padding(.horizontal, 15)
-                                    .padding(.vertical, 10)
-                                    .background(Color.appGreen.opacity(0.1))
-                                    .cornerRadius(10)
+                                    VStack(spacing: 0) { DetailRow(icon: "mappin.and.ellipse", title: "Area", value: approximateLocation) }.padding().background(Color.themeBackground).cornerRadius(15)
+                                    HStack { Image(systemName: "lock.fill").foregroundColor(.appGreen).font(.caption); Text("Sign in to see exact date, time and location").font(.caption).foregroundColor(.themeSecondaryText) }.padding(.horizontal, 15).padding(.vertical, 10).background(Color.appGreen.opacity(0.1)).cornerRadius(10)
                                 }
                                 
-                                // Bio Attività
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("About").font(.headline).foregroundColor(.themeText)
-                                    Text(activityToShow.description).font(.body).foregroundColor(.themeSecondaryText).lineSpacing(4)
-                                }
+                                VStack(alignment: .leading, spacing: 10) { Text("About").font(.headline).foregroundColor(.themeText); Text(activityToShow.description).font(.body).foregroundColor(.themeSecondaryText).lineSpacing(4) }
                                 
-                                // TASTO INVITA AMICO (solo se loggato e joined)
-                                if isLoggedIn && isJoined {
-                                    Button(action: { showShareSheet = true }) {
-                                        HStack {
-                                            Image(systemName: "square.and.arrow.up")
-                                                .font(.headline)
-                                            Text("Invite a Friend")
-                                                .font(.headline)
-                                                .fontWeight(.semibold)
-                                        }
-                                        .foregroundColor(.appGreen)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.appGreen.opacity(0.1))
-                                        .cornerRadius(15)
-                                    }
-                                }
-                                
-                                // BOTTONE AZIONE (Join/Leave/Delete)
                                 Button(action: {
                                     if isLoggedIn {
                                         if isCreator { activeAlert = .delete }
                                         else if isJoined { activeAlert = .leave }
                                         else {
                                             manager.joinActivityOnline(activity: activityToShow)
-                                            // Aggiungi al calendario
-                                            CalendarHelper.addToCalendar(activity: activityToShow)
                                             withAnimation { showSuccess = true }
                                         }
                                     } else {
                                         onLoginRequest?(.joinActivity(activityToShow))
                                     }
                                 }) {
-                                    Text(isCreator ? "Cancel Activity" : (isJoined ? "Leave Activity" : "Join Activity"))
-                                        .font(.headline).fontWeight(.bold).foregroundColor(.white).frame(maxWidth: .infinity).padding().frame(height: 55)
-                                        .background(isCreator || isJoined ? Color.red : Color.appGreen).cornerRadius(18)
-                                        .shadow(color: (isCreator || isJoined ? Color.red : Color.appGreen).opacity(0.3), radius: 8, y: 4)
+                                    Text(isCreator ? "Cancel Activity" : (isJoined ? "Leave Activity" : "Join Activity")).font(.headline).fontWeight(.bold).foregroundColor(.white).frame(maxWidth: .infinity).padding().frame(height: 55).background(isCreator || isJoined ? Color.red : Color.appGreen).cornerRadius(18).shadow(color: (isCreator || isJoined ? Color.red : Color.appGreen).opacity(0.3), radius: 8, y: 4)
                                 }
                             }.padding(20)
-                        }
-                        .background(Color.themeCard).clipShape(RoundedRectangle(cornerRadius: 25))
-                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
-                        
+                        }.background(Color.themeCard).clipShape(RoundedRectangle(cornerRadius: 25)).shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
                         Spacer().frame(height: 120)
                     }.padding(.horizontal, 25).padding(.top, 10)
                 }
             }
             
-            // OVERLAYS
             if showSuccess { SuccessOverlay(onClose: { showSuccess = false; presentationMode.wrappedValue.dismiss() }).zIndex(20) }
             if showLeaveSuccess { LeaveSuccessOverlay(title: "Left", message: "You left the activity.", iconName: "arrow.uturn.left", color: .red, onClose: { showLeaveSuccess = false; presentationMode.wrappedValue.dismiss() }).zIndex(20) }
             if showDeleteSuccess { LeaveSuccessOverlay(title: "Cancelled", message: "Activity deleted.", iconName: "trash", color: .red, onClose: { manager.delete(activity: activityToShow); showDeleteSuccess = false; presentationMode.wrappedValue.dismiss() }).zIndex(20) }
             if showFavoriteSuccess { LeaveSuccessOverlay(title: "Great!", message: "Added to favourites!", iconName: "heart.fill", color: .red, onClose: { withAnimation { showFavoriteSuccess = false } }).zIndex(20) }
+            if showUnfavoriteSuccess { LeaveSuccessOverlay(title: "Removed", message: "Removed from favorites.", iconName: "heart.slash.fill", color: .gray, onClose: { withAnimation { showUnfavoriteSuccess = false } }).zIndex(20) }
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showEditView) { EditActivityView(activity: activityToShow) }
-        .sheet(isPresented: $showShareSheet) {
-            ShareSheet(items: [createShareMessage()])
+        .onAppear {
+            Task { await manager.fetchParticipants(for: activityToShow.id) }
+            
+            // *** FIX: CONTROLLO SEGNALE DI SUCCESSO DOPO LOGIN ***
+            if manager.shouldShowSuccessAfterLogin {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation { showSuccess = true }
+                    manager.shouldShowSuccessAfterLogin = false // Reset del segnale
+                }
+            }
         }
-        .onAppear { Task { await manager.fetchParticipants(for: activityToShow.id) } }
         .alert(item: $activeAlert) { type in
             switch type {
-            case .leave: return Alert(title: Text("Leave?"), message: Text("Sure?"), primaryButton: .destructive(Text("Leave")) {
-                manager.leaveActivityOnline(activity: activityToShow)
-                // Rimuovi dal calendario
-                CalendarHelper.removeFromCalendar(activity: activityToShow)
-                DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showLeaveSuccess=true}}
-            }, secondaryButton: .cancel())
-            case .delete: return Alert(title: Text("Delete?"), message: Text("Sure?"), primaryButton: .destructive(Text("Delete")) {
-                DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showDeleteSuccess=true}}
-            }, secondaryButton: .cancel())
+            case .leave: return Alert(title: Text("Leave?"), message: Text("Sure?"), primaryButton: .destructive(Text("Leave")) { manager.leaveActivityOnline(activity: activityToShow); DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showLeaveSuccess=true}} }, secondaryButton: .cancel())
+            case .delete: return Alert(title: Text("Delete?"), message: Text("Sure?"), primaryButton: .destructive(Text("Delete")) { DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showDeleteSuccess=true}} }, secondaryButton: .cancel())
             }
         }
     }
-    
-    // FUNZIONE PER APRIRE APPLE MAPS
-    private func openInMaps(latitude: Double, longitude: Double, name: String) {
-        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        let placemark = MKPlacemark(coordinate: coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = name
-        mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
-    }
-    
-    // FUNZIONE PER CREARE IL MESSAGGIO DI INVITO
-    private func createShareMessage() -> String {
-        return """
-        Hey! Join me for "\(activityToShow.title)" on \(activityToShow.date.formatted(date: .long, time: .shortened))!
-        
-        📍 Location: \(activityToShow.locationName)
-        📝 Details: \(activityToShow.description)
-        
-        Download app.ariamo to join! 🎉
-        """
-    }
 }
 
-// SHARE SHEET
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-// SUPPORTING VIEWS
+// --- SUPPORTING VIEWS ---
 struct DetailRow: View {
     let icon: String; let title: String; let value: String
     var body: some View {

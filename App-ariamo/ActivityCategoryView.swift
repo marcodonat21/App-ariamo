@@ -61,7 +61,7 @@ struct ActivityCategoryView: View {
                     }
                 }
                 .padding(.horizontal, 25)
-                .padding(.top, 50)
+                .padding(.top, 10)
                 .padding(.bottom, 20)
                 
                 // LISTA ATTIVITÀ
