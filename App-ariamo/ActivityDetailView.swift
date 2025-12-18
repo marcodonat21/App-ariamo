@@ -16,7 +16,6 @@ struct ActivityDetailView: View {
     @State private var showDeleteSuccess = false
     @State private var showFavoriteSuccess = false
     @State private var showUnfavoriteSuccess = false
-    @State private var showShareSheet = false
     
     @State private var activeAlert: ActivityAlert?
     @State private var showEditView = false
@@ -61,11 +60,19 @@ struct ActivityDetailView: View {
         return "Within 2km of this area"
     }
     
+    // --- MESSAGGIO DI CONDIVISIONE ---
+    var shareMessage: String {
+        let time = activityToShow.date.formatted(date: .omitted, time: .shortened)
+        let userName = userManager.currentUser.name.isEmpty ? "Someone" : userManager.currentUser.name
+        return "\(userName) invites you! ⚽️ \(activityToShow.title) at \(activityToShow.locationName) @ \(time). Join us? Download App-ariamo!"
+    }
+    
     var body: some View {
         ZStack(alignment: .top) {
             Color.themeBackground.ignoresSafeArea()
             
             VStack(spacing: 0) {
+                // HEADER
                 HStack {
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
                         Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.themeCard).clipShape(Circle()).shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
@@ -78,11 +85,14 @@ struct ActivityDetailView: View {
                         }
                     } else { Color.clear.frame(width: 44, height: 44) }
                 }
-                .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 15).background(Color.themeBackground)
+                .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 15).background(Color.themeBackground)
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
+                        
+                        // CARD PRINCIPALE
                         VStack(spacing: 0) {
+                            // Immagine
                             GeometryReader { geo in
                                 if let data = activityToShow.imageData, let uiImage = UIImage(data: data) {
                                     Image(uiImage: uiImage).resizable().aspectRatio(contentMode: .fill).frame(width: geo.size.width, height: 250).clipped()
@@ -94,6 +104,7 @@ struct ActivityDetailView: View {
                             }.frame(height: 250)
                             
                             VStack(alignment: .leading, spacing: 20) {
+                                // Titolo e Header
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text(activityToShow.category.uppercased()).font(.caption).fontWeight(.bold).foregroundColor(activityToShow.color).padding(.horizontal, 10).padding(.vertical, 5).background(activityToShow.color.opacity(0.1)).cornerRadius(8)
@@ -126,8 +137,33 @@ struct ActivityDetailView: View {
                                         Divider().padding(.leading, 50)
                                         DetailRow(icon: "clock", title: "Time", value: activityToShow.date.formatted(date: .omitted, time: .shortened))
                                         Divider().padding(.leading, 50)
-                                        DetailRow(icon: "mappin.and.ellipse", title: "Location", value: activityToShow.locationName)
-                                    }.padding().background(Color.themeBackground).cornerRadius(15)
+                                        
+                                        // RIGA LOCATION CUSTOM (CON TASTO GO)
+                                        HStack(spacing: 15) {
+                                            ZStack {
+                                                Circle().fill(Color.appGreen.opacity(0.1)).frame(width: 40, height: 40)
+                                                Image(systemName: "mappin.and.ellipse").font(.system(size: 18)).foregroundColor(.appGreen)
+                                            }
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("Location").font(.caption).foregroundColor(.gray)
+                                                Text(activityToShow.locationName).font(.subheadline).fontWeight(.semibold).foregroundColor(.themeText).lineLimit(1)
+                                            }
+                                            Spacer()
+                                            
+                                            // TASTO GO
+                                            Button(action: openMaps) {
+                                                Text("GO")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 6)
+                                                    .background(Color.appGreen)
+                                                    .cornerRadius(10)
+                                            }
+                                        }
+                                        .padding(.vertical, 8).padding(.horizontal, 15)
+                                    }
+                                    .padding().background(Color.themeBackground).cornerRadius(15)
                                 } else {
                                     VStack(spacing: 0) { DetailRow(icon: "mappin.and.ellipse", title: "Area", value: approximateLocation) }.padding().background(Color.themeBackground).cornerRadius(15)
                                     HStack { Image(systemName: "lock.fill").foregroundColor(.appGreen).font(.caption); Text("Sign in to see exact date, time and location").font(.caption).foregroundColor(.themeSecondaryText) }.padding(.horizontal, 15).padding(.vertical, 10).background(Color.appGreen.opacity(0.1)).cornerRadius(10)
@@ -135,13 +171,32 @@ struct ActivityDetailView: View {
                                 
                                 VStack(alignment: .leading, spacing: 10) { Text("About").font(.headline).foregroundColor(.themeText); Text(activityToShow.description).font(.body).foregroundColor(.themeSecondaryText).lineSpacing(4) }
                                 
+                                // --- TASTO INVITE FRIENDS (ORA SOPRA) ---
+                                if isLoggedIn {
+                                    ShareLink(item: shareMessage) {
+                                        HStack {
+                                            Image(systemName: "square.and.arrow.up")
+                                            Text("Invite Friends")
+                                        }
+                                        .font(.headline)
+                                        .foregroundColor(.appGreen)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.appGreen.opacity(0.1))
+                                        .cornerRadius(18)
+                                    }
+                                    .padding(.bottom, 5) // Spazio per staccarlo dal bottone sotto
+                                }
+                                
+                                // BOTTONE PRINCIPALE (SOTTO)
                                 Button(action: {
                                     if isLoggedIn {
                                         if isCreator { activeAlert = .delete }
                                         else if isJoined { activeAlert = .leave }
                                         else {
                                             manager.joinActivityOnline(activity: activityToShow)
-                                            withAnimation { showSuccess = true }
+                                            if manager.shouldShowSuccessAfterLogin { /* Gestito in onAppear */ }
+                                            else { withAnimation { showSuccess = true } }
                                         }
                                     } else {
                                         onLoginRequest?(.joinActivity(activityToShow))
@@ -149,6 +204,7 @@ struct ActivityDetailView: View {
                                 }) {
                                     Text(isCreator ? "Cancel Activity" : (isJoined ? "Leave Activity" : "Join Activity")).font(.headline).fontWeight(.bold).foregroundColor(.white).frame(maxWidth: .infinity).padding().frame(height: 55).background(isCreator || isJoined ? Color.red : Color.appGreen).cornerRadius(18).shadow(color: (isCreator || isJoined ? Color.red : Color.appGreen).opacity(0.3), radius: 8, y: 4)
                                 }
+                                
                             }.padding(20)
                         }.background(Color.themeCard).clipShape(RoundedRectangle(cornerRadius: 25)).shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
                         Spacer().frame(height: 120)
@@ -166,13 +222,8 @@ struct ActivityDetailView: View {
         .sheet(isPresented: $showEditView) { EditActivityView(activity: activityToShow) }
         .onAppear {
             Task { await manager.fetchParticipants(for: activityToShow.id) }
-            
-            // *** FIX: CONTROLLO SEGNALE DI SUCCESSO DOPO LOGIN ***
             if manager.shouldShowSuccessAfterLogin {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation { showSuccess = true }
-                    manager.shouldShowSuccessAfterLogin = false // Reset del segnale
-                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { withAnimation { showSuccess = true }; manager.shouldShowSuccessAfterLogin = false }
             }
         }
         .alert(item: $activeAlert) { type in
@@ -180,6 +231,15 @@ struct ActivityDetailView: View {
             case .leave: return Alert(title: Text("Leave?"), message: Text("Sure?"), primaryButton: .destructive(Text("Leave")) { manager.leaveActivityOnline(activity: activityToShow); DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showLeaveSuccess=true}} }, secondaryButton: .cancel())
             case .delete: return Alert(title: Text("Delete?"), message: Text("Sure?"), primaryButton: .destructive(Text("Delete")) { DispatchQueue.main.asyncAfter(deadline: .now()+0.2){withAnimation{showDeleteSuccess=true}} }, secondaryButton: .cancel())
             }
+        }
+    }
+    
+    func openMaps() {
+        let lat = activityToShow.latitude
+        let lon = activityToShow.longitude
+        let url = URL(string: "maps://?daddr=\(lat),\(lon)")
+        if let url = url, UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
         }
     }
 }

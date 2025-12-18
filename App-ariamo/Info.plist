@@ -1,25 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-    <!-- FACE ID PERMISSION -->
-    <key>NSFaceIDUsageDescription</key>
-    <string>We use Face ID to securely log you into the app.</string>
-    
-    <!-- LOCATION PERMISSIONS (già presenti ma aggiungo per sicurezza) -->
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>We need your location to show nearby activities on the map.</string>
-    
-    <!-- CAMERA PERMISSION -->
-    <key>NSCameraUsageDescription</key>
-    <string>We need camera access to take photos for your activities.</string>
-    
-    <!-- PHOTO LIBRARY PERMISSION -->
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>We need access to your photo library to select images.</string>
-    
-    <!-- CALENDAR PERMISSION (per feature #5) -->
-    <key>NSCalendarsUsageDescription</key>
-    <string>We need calendar access to add your activities to your iPhone calendar.</string>
-</dict>
+<dict/>
 </plist>

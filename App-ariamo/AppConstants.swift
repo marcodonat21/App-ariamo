@@ -4,6 +4,7 @@ import Combine
 import CoreLocation
 import UserNotifications
 import Supabase
+import EventKit // <--- NUOVO IMPORT FONDAMENTALE
 
 // --- 1. CONFIGURAZIONE COLORI ---
 extension Color {
@@ -98,6 +99,67 @@ class NotificationHelper: NSObject, UNUserNotificationCenterDelegate {
         completionHandler()
     }
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) { completionHandler([.banner, .sound]) }
+}
+
+// --- CALENDAR MANAGER (NUOVO) ---
+class CalendarManager {
+    static let shared = CalendarManager()
+    private let eventStore = EKEventStore()
+    
+    private init() {}
+    
+    func requestAccess(completion: @escaping (Bool) -> Void) {
+        if #available(iOS 17.0, *) {
+            eventStore.requestFullAccessToEvents { granted, error in
+                DispatchQueue.main.async { completion(granted) }
+            }
+        } else {
+            eventStore.requestAccess(to: .event) { granted, error in
+                DispatchQueue.main.async { completion(granted) }
+            }
+        }
+    }
+    
+    func addEvent(for activity: Activity) {
+        requestAccess { granted in
+            guard granted else { return }
+            
+            let event = EKEvent(eventStore: self.eventStore)
+            event.title = "App-ariamo: \(activity.title)"
+            event.startDate = activity.date
+            event.endDate = activity.date.addingTimeInterval(3600) // Durata default 1 ora
+            event.notes = activity.description + "\n\nLocation: \(activity.locationName)"
+            event.calendar = self.eventStore.defaultCalendarForNewEvents
+            
+            do {
+                try self.eventStore.save(event, span: .thisEvent)
+                // Salviamo l'ID dell'evento per poterlo rimuovere dopo
+                UserDefaults.standard.set(event.eventIdentifier, forKey: "calendar_event_\(activity.id.uuidString)")
+                print("✅ Event added to calendar")
+            } catch {
+                print("❌ Failed to save event: \(error)")
+            }
+        }
+    }
+    
+    func removeEvent(for activity: Activity) {
+        requestAccess { granted in
+            guard granted else { return }
+            
+            // Recuperiamo l'ID salvato
+            if let eventID = UserDefaults.standard.string(forKey: "calendar_event_\(activity.id.uuidString)") {
+                if let event = self.eventStore.event(withIdentifier: eventID) {
+                    do {
+                        try self.eventStore.remove(event, span: .thisEvent)
+                        UserDefaults.standard.removeObject(forKey: "calendar_event_\(activity.id.uuidString)")
+                        print("🗑️ Event removed from calendar")
+                    } catch {
+                        print("❌ Failed to remove event: \(error)")
+                    }
+                }
+            }
+        }
+    }
 }
 
 struct ParticipantDTO: Codable, Identifiable {
@@ -248,6 +310,9 @@ class ActivityManager: ObservableObject {
             self.joinedActivities.removeAll { $0.id == activity.id }
             self.allActivities.removeAll { $0.id == activity.id }
             self.saveCreated(); self.saveJoined()
+            
+            // RIMUOVI DAL CALENDARIO
+            CalendarManager.shared.removeEvent(for: activity)
         }
         Task { try? await client.from("activities").delete().eq("id", value: activity.id.uuidString).execute() }
     }
@@ -337,8 +402,25 @@ class ActivityManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "joinedActivities"), let dec = try? JSONDecoder().decode([Activity].self, from: data) { self.joinedActivities = dec }
         if let data = UserDefaults.standard.data(forKey: "favorites"), let dec = try? JSONDecoder().decode([UUID].self, from: data) { self.favoriteActivities = dec }
     }
-    func join(activity: Activity) { if !isJoined(activity: activity) { joinedActivities.append(activity); saveJoined(); NotificationHelper.scheduleNotification(for: activity) } }
-    func leave(activity: Activity) { joinedActivities.removeAll { $0.id == activity.id }; saveJoined(); NotificationHelper.cancelNotification(for: activity) }
+    
+    func join(activity: Activity) {
+        if !isJoined(activity: activity) {
+            joinedActivities.append(activity)
+            saveJoined()
+            NotificationHelper.scheduleNotification(for: activity)
+            // AGGIUNGI AL CALENDARIO
+            CalendarManager.shared.addEvent(for: activity)
+        }
+    }
+    
+    func leave(activity: Activity) {
+        joinedActivities.removeAll { $0.id == activity.id }
+        saveJoined()
+        NotificationHelper.cancelNotification(for: activity)
+        // RIMUOVI DAL CALENDARIO
+        CalendarManager.shared.removeEvent(for: activity)
+    }
+    
     func toggleFavorite(activity: Activity) { if favoriteActivities.contains(activity.id) { favoriteActivities.removeAll { $0 == activity.id } } else { favoriteActivities.append(activity.id) }; saveFavorites() }
     func isFavorite(activity: Activity) -> Bool { favoriteActivities.contains(activity.id) }
     func isCreator(activity: Activity) -> Bool { return activity.creatorId == UserManager.shared.currentUser.id }
@@ -472,23 +554,12 @@ class UserManager: ObservableObject {
         try await client.auth.resetPasswordForEmail(email)
     }
     
-    // --- NUOVA FUNZIONE PER CANCELLARE L'ACCOUNT ---
+    // --- FUNZIONE DELETE ACCOUNT ---
     func deleteAccount() async throws {
         let userId = currentUser.id.uuidString
-        
-        // 1. Cancella le attività create dall'utente
         try await client.from("activities").delete().eq("creator_id", value: userId).execute()
-        
-        // 2. Rimuovi l'utente da tutte le attività a cui partecipa
         try await client.from("participants").delete().eq("user_id", value: userId).execute()
-        
-        // 3. Cancella il profilo utente
         try await client.from("profiles").delete().eq("id", value: userId).execute()
-        
-        // 4. Cancella l'utente dall'autenticazione (Richiede privilegi admin o una edge function, ma proviamo così)
-        // Nota: Supabase Auth non permette di cancellare l'utente direttamente dal client per sicurezza.
-        // Per ora, facciamo il logout e puliamo i dati locali. I dati nel DB sono comunque rimossi.
-        
         logout()
     }
     
@@ -511,15 +582,13 @@ struct DatiEvento { var titolo, tipo, descrizione: String; var data: Date; var l
 
 extension Activity { static let testActivity = Activity(id: UUID(), title: "Test", imageName: "star", color: .blue, creatorId: UUID()) }
 
-// --- FIX PER LO SWIPE BACK (SCIPPARE VERSO SINISTRA) ---
+// --- FIX PER LO SWIPE BACK ---
 extension UINavigationController: UIGestureRecognizerDelegate {
     override open func viewDidLoad() {
         super.viewDidLoad()
         interactivePopGestureRecognizer?.delegate = self
     }
-
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        // Attiva lo swipe solo se c'è più di una schermata nello stack (quindi non nella home)
         return viewControllers.count > 1
     }
 }
