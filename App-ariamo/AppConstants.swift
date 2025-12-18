@@ -510,3 +510,16 @@ struct CustomBackButton: View { @Environment(\.presentationMode) var pm; var bod
 struct DatiEvento { var titolo, tipo, descrizione: String; var data: Date; var luogo: String; var imageData: Data?; var lat, lon: Double?; init() { titolo=""; tipo=""; descrizione=""; data=Date(); luogo=""; imageData=nil; lat=nil; lon=nil } }
 
 extension Activity { static let testActivity = Activity(id: UUID(), title: "Test", imageName: "star", color: .blue, creatorId: UUID()) }
+
+// --- FIX PER LO SWIPE BACK (SCIPPARE VERSO SINISTRA) ---
+extension UINavigationController: UIGestureRecognizerDelegate {
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Attiva lo swipe solo se c'è più di una schermata nello stack (quindi non nella home)
+        return viewControllers.count > 1
+    }
+}
