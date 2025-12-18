@@ -291,6 +291,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "App-ariamo/Info.plist";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "We need calendar access to add your activities to your iPhone calendar.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "We need calendar access to add your activities to your iPhone calendar.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need camera access to take photos for your activities.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "We use Face ID to securely log you into the app.";
@@ -333,6 +334,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "App-ariamo/Info.plist";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "We need calendar access to add your activities to your iPhone calendar.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "We need calendar access to add your activities to your iPhone calendar.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need camera access to take photos for your activities.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "We use Face ID to securely log you into the app.";
