@@ -243,7 +243,6 @@ struct EditProfileView: View {
                                             .background(user.interests.contains(sport.0) ? Color.appGreen : Color(UIColor.systemGray6))
                                             .foregroundColor(user.interests.contains(sport.0) ? .white : .gray)
                                             .cornerRadius(10)
-                                            //.shadow(color: .black.opacity(0.05), radius: 2)
                                     }.buttonStyle(PlainButtonStyle())
                                 }
                             }
@@ -276,7 +275,7 @@ struct EditProfileView: View {
                             .foregroundColor(.red)
                             .padding()
                         }
-                        .padding(.bottom, 80) // SPAZIO PER NON ANDARE SOTTO LA BARRA
+                        .padding(.bottom, 90) // SPAZIO PER NON ANDARE SOTTO LA BARRA
                     }
                     .padding(.bottom, 20)
                 }
@@ -317,7 +316,7 @@ struct EditProfileView: View {
             do {
                 try await UserManager.shared.updateUserProfile(user: user)
                 if !user.email.isEmpty && !user.password.isEmpty {
-                   try await UserManager.shared.updateCredentials(email: user.email, password: user.password)
+                    try await UserManager.shared.updateCredentials(email: user.email, password: user.password)
                 }
                 presentationMode.wrappedValue.dismiss()
             } catch {
@@ -388,7 +387,7 @@ struct CustomProfileSecureField: View {
     }
 }
 
-// --- LISTE ATTIVITÀ (PADDING CORRETTO) ---
+// --- LISTE ATTIVITÀ (CON CORREZIONE PADDING SCROLL) ---
 
 struct CreatedActivitiesView: View {
     @ObservedObject var manager = ActivityManager.shared
@@ -397,8 +396,22 @@ struct CreatedActivitiesView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(radius: 4) }; Spacer(); Text("Created Activities").font(.headline).bold(); Spacer(); Color.clear.frame(width: 44, height: 44) }.padding().padding(.top, 10)
-            if manager.createdActivities.isEmpty { Spacer(); Text("No activities created yet.").foregroundColor(.gray); Spacer() }
-            else { ScrollView { VStack(spacing: 15) { ForEach(manager.createdActivities) { activity in NavigationLink(destination: ActivityDetailView(activity: activity, onLoginRequest: { _ in onLoginRequest?() })) { ActivityRow(activity: activity) } } }.padding() } }
+            
+            if manager.createdActivities.isEmpty {
+                Spacer(); Text("No activities created yet.").foregroundColor(.gray); Spacer()
+            } else {
+                ScrollView {
+                    VStack(spacing: 15) {
+                        ForEach(manager.createdActivities) { activity in
+                            NavigationLink(destination: ActivityDetailView(activity: activity, onLoginRequest: { _ in onLoginRequest?() })) {
+                                ActivityRow(activity: activity)
+                            }
+                        }
+                    }
+                    .padding()
+                    .padding(.bottom, 90) // FIX: Padding extra per scroll completo
+                }
+            }
         }.navigationBarHidden(true).background(Color(UIColor.systemGray6).ignoresSafeArea())
     }
 }
@@ -410,8 +423,22 @@ struct JoinedActivitiesView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack { Button(action: { presentationMode.wrappedValue.dismiss() }) { Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundColor(.appGreen).padding(12).background(Color.white).clipShape(Circle()).shadow(radius: 4) }; Spacer(); Text("Joined Activities").font(.headline).bold(); Spacer(); Color.clear.frame(width: 44, height: 44) }.padding().padding(.top, 10)
-            if manager.joinedActivities.isEmpty { Spacer(); Text("No activities joined yet.").foregroundColor(.gray); Spacer() }
-            else { ScrollView { VStack(spacing: 15) { ForEach(manager.joinedActivities) { activity in NavigationLink(destination: ActivityDetailView(activity: activity, onLoginRequest: { _ in onLoginRequest?() })) { ActivityRow(activity: activity) } } }.padding() } }
+            
+            if manager.joinedActivities.isEmpty {
+                Spacer(); Text("No activities joined yet.").foregroundColor(.gray); Spacer()
+            } else {
+                ScrollView {
+                    VStack(spacing: 15) {
+                        ForEach(manager.joinedActivities) { activity in
+                            NavigationLink(destination: ActivityDetailView(activity: activity, onLoginRequest: { _ in onLoginRequest?() })) {
+                                ActivityRow(activity: activity)
+                            }
+                        }
+                    }
+                    .padding()
+                    .padding(.bottom, 90) // FIX: Padding extra per scroll completo
+                }
+            }
         }.navigationBarHidden(true).background(Color(UIColor.systemGray6).ignoresSafeArea())
     }
 }
@@ -440,14 +467,16 @@ struct FavoriteActivitiesView: View {
                                 ActivityRow(activity: activity)
                             }
                         }
-                    }.padding()
+                    }
+                    .padding()
+                    .padding(.bottom, 90) // FIX: Padding extra per scroll completo
                 }
             }
         }.navigationBarHidden(true).background(Color(UIColor.systemGray6).ignoresSafeArea())
     }
 }
 
-// --- ACTIVITY ROW STYLE: "Category View Like" (Circle + Green Border) ---
+// --- ACTIVITY ROW STYLE ---
 struct ActivityRow: View {
     let activity: Activity
     @ObservedObject var manager = ActivityManager.shared
@@ -470,7 +499,7 @@ struct ActivityRow: View {
                     .overlay(Circle().stroke(Color.appGreen, lineWidth: 2))
                 } else {
                     Image(systemName: activity.imageName)
-                        .font(.title) // Icona grande come nella CategoryView
+                        .font(.title)
                         .foregroundColor(.white)
                         .frame(width: 60, height: 60)
                         .background(activity.color)
@@ -494,38 +523,23 @@ struct ActivityRow: View {
             
             Spacer()
             
-            // ICONE DI STATO (Stella, Cuore, Spunta, Freccia)
+            // ICONE DI STATO
             HStack(spacing: 6) {
-                // 1. STELLA (Creator)
                 if manager.isCreator(activity: activity) {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
+                    Image(systemName: "star.fill").foregroundColor(.orange).font(.caption)
                 }
-                
-                // 2. CUORE (Favorite)
                 if manager.isFavorite(activity: activity) {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.caption)
+                    Image(systemName: "heart.fill").foregroundColor(.red).font(.caption)
                 }
-                
-                // 3. SPUNTA (Joined)
                 if manager.isJoined(activity: activity) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.appGreen)
-                        .font(.caption)
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(.appGreen).font(.caption)
                 }
-                
-                // 4. FRECCIA
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.gray)
-                    .font(.caption)
+                Image(systemName: "chevron.right").foregroundColor(.gray).font(.caption)
             }
         }
         .padding()
         .background(Color.white)
-        .cornerRadius(15) // Card Arrotondata
+        .cornerRadius(15)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
@@ -553,7 +567,7 @@ struct MenuRowItem: View {
     let icon: String; let title: String; let color: Color
     var body: some View {
         HStack { Image(systemName: icon).font(.title2).foregroundColor(color).frame(width: 40); Text(title).font(.headline).foregroundColor(.black); Spacer(); Image(systemName: "chevron.right").foregroundColor(.gray) }
-        .padding().background(Color.white).cornerRadius(15).shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1).overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            .padding().background(Color.white).cornerRadius(15).shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1).overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.gray.opacity(0.2), lineWidth: 1))
     }
 }
 
@@ -582,13 +596,31 @@ struct ProfileScreen_Previews: PreviewProvider {
             NavigationView {
                 ProfileScreen(isLoggedIn: .constant(true))
                     .onAppear {
-                        UserManager.shared.currentUser = UserProfile(name: "Mario", surname: "Rossi", age: 30, gender: "Man", bio: "Ciao!", motto: "", image: "person.circle", email: "mario@rossi.it", password: "password", interests: ["Swimming", "Hiking"], shareLocation: true, notifications: true)
+                        UserManager.shared.currentUser = UserProfile(
+                            name: "Mario",
+                            surname: "Rossi",
+                            age: 30,
+                            gender: "Man",
+                            bio: "Amo lo sport e la natura!",
+                            motto: "Never give up",
+                            image: "person.circle",
+                            email: "mario@rossi.it",
+                            password: "password",
+                            interests: ["Swimming", "Hiking"],
+                            shareLocation: true,
+                            notifications: true
+                        )
                     }
-            }.previewDisplayName("Loggato")
+            }
+            .previewDisplayName("Loggato")
+            
             NavigationView {
                 ProfileScreen(isLoggedIn: .constant(false))
-                    .onAppear { UserManager.shared.currentUser = UserProfile.empty }
-            }.previewDisplayName("Ospite")
+                    .onAppear {
+                        UserManager.shared.currentUser = UserProfile.empty
+                    }
+            }
+            .previewDisplayName("Ospite")
         }
     }
 }
