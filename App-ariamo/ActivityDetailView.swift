@@ -114,13 +114,15 @@ struct ActivityDetailView: View {
                                     HStack {
                                         Text(activityToShow.category.uppercased()).font(.caption).fontWeight(.bold).foregroundColor(activityToShow.color).padding(.horizontal, 10).padding(.vertical, 5).background(activityToShow.color.opacity(0.1)).cornerRadius(8)
                                         Spacer()
+                                        
+                                        // *** UNICA MODIFICA: QUI CAMBIO DA .joinActivity A .favoriteActivity ***
                                         Button(action: {
                                             if isLoggedIn {
                                                 manager.toggleFavorite(activity: activityToShow)
                                                 if manager.isFavorite(activity: activityToShow) { withAnimation { showFavoriteSuccess = true } }
                                                 else { withAnimation { showUnfavoriteSuccess = true } }
                                             } else {
-                                                onLoginRequest?(.joinActivity(activityToShow))
+                                                onLoginRequest?(.favoriteActivity(activityToShow))  // <--- MODIFICATO
                                             }
                                         }) {
                                             Image(systemName: isFavorite ? "heart.fill" : "heart").font(.title2).foregroundColor(isFavorite ? .red : .gray).padding(8).background(Color.themeBackground).clipShape(Circle())
@@ -230,11 +232,27 @@ struct ActivityDetailView: View {
             if manager.shouldShowSuccessAfterLogin {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { withAnimation { showSuccess = true }; manager.shouldShowSuccessAfterLogin = false }
             }
+            // *** AGGIUNTO: gestione favoriti dopo login ***
+            if manager.shouldShowFavoriteSuccessAfterLogin {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation { showFavoriteSuccess = true }
+                    manager.shouldShowFavoriteSuccessAfterLogin = false
+                }
+            }
         }.onChange(of: manager.shouldShowSuccessAfterLogin) { newValue in
             if newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation { showSuccess = true }
                     manager.shouldShowSuccessAfterLogin = false
+                }
+            }
+        }
+        // *** AGGIUNTO: observer per favoriti ***
+        .onChange(of: manager.shouldShowFavoriteSuccessAfterLogin) { newValue in
+            if newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation { showFavoriteSuccess = true }
+                    manager.shouldShowFavoriteSuccessAfterLogin = false
                 }
             }
         }

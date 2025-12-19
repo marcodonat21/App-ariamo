@@ -6,6 +6,7 @@ enum AuthContext {
     case profile
     case createActivity
     case joinActivity(Activity)
+    case favoriteActivity(Activity)  // NUOVO: per gestire i preferiti
 }
 
 struct ContentView: View {
@@ -54,9 +55,12 @@ struct ContentView: View {
                             .id(homeID)
                             
                         case .activities:
-                            ActivityListScreen()
-                                .navigationBarHidden(true)
-                                .id(activitiesID)
+                            ActivityListScreen(onLoginRequest: { context in
+                                self.authContext = context
+                                self.showAuthSheet = true
+                            })
+                            .navigationBarHidden(true)
+                            .id(activitiesID)
                                 
                         case .profile:
                             ProfileScreen(isLoggedIn: $isLoggedIn, onLoginRequest: {
@@ -91,7 +95,6 @@ struct ContentView: View {
                     onClose: {
                         showAlreadyJoinedAlert = false
                         authContext = .none
-                        // FIX: Non riapriamo più la scheda qui
                     }
                 )
                 .zIndex(100)
@@ -104,7 +107,6 @@ struct ContentView: View {
                     onClose: {
                         showCreatorAlert = false
                         authContext = .none
-                        // FIX: Non riapriamo più la scheda qui
                     }
                 )
                 .zIndex(100)
@@ -167,13 +169,17 @@ struct ContentView: View {
                 // Segnale per mostrare il popup di successo nella vista sottostante
                 manager.shouldShowSuccessAfterLogin = true
                 
-                // *** FIX IMPORTANTE ***
-                // Abbiamo rimosso le righe che impostavano 'showDetailFromNotification = true'.
-                // Dato che l'utente era già sulla scheda dettaglio prima del login,
-                // quando il login si chiude, si ritrova esattamente lì. Non serve riaprirla.
-                
                 authContext = .none
             }
+            
+        case .favoriteActivity(let activity):
+            // Aggiungi ai preferiti dopo il login
+            manager.toggleFavorite(activity: activity)
+            
+            // Segnala che deve mostrare il popup di successo
+            manager.shouldShowFavoriteSuccessAfterLogin = true
+            
+            authContext = .none
             
         case .none:
             break
@@ -207,7 +213,7 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal)
-        .padding(.bottom, 5) // <--- MODIFICATO DA 30 A 5 PER ABBASSARE LA BARRA
+        .padding(.bottom, 5)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
     
