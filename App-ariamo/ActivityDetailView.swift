@@ -230,6 +230,13 @@ struct ActivityDetailView: View {
             if manager.shouldShowSuccessAfterLogin {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { withAnimation { showSuccess = true }; manager.shouldShowSuccessAfterLogin = false }
             }
+        }.onChange(of: manager.shouldShowSuccessAfterLogin) { newValue in
+            if newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation { showSuccess = true }
+                    manager.shouldShowSuccessAfterLogin = false
+                }
+            }
         }
         .alert(item: $activeAlert) { type in
             switch type {
