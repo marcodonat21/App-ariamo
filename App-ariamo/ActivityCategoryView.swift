@@ -16,26 +16,26 @@ struct ActivityCategoryView: View {
     var onLoginRequest: ((AuthContext) -> Void)?
     
     // Logica di filtraggio
-        var filteredActivities: [Activity] {
-            // *** MODIFICA: Solo manager.allActivities (Database) ***
-            let rawActivities = manager.allActivities
-            
-            // Rimuoviamo duplicati
-            let allActivities = Array(Dictionary(grouping: rawActivities, by: { $0.id }).compactMap { $0.value.first })
-            
-            // 2. Filtriamo per Categoria
-            var result = allActivities.filter { $0.category == category }
-            
-            // 3. Applichiamo i Filtri
-            result = filters.apply(to: result)
-            
-            // 4. Filtriamo per Testo
-            if !searchText.isEmpty {
-                result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
-            }
-            
-            return result
+    var filteredActivities: [Activity] {
+        // *** MODIFICA: Solo manager.allActivities (Database) ***
+        let rawActivities = manager.allActivities
+        
+        // Rimuoviamo duplicati
+        let allActivities = Array(Dictionary(grouping: rawActivities, by: { $0.id }).compactMap { $0.value.first })
+        
+        // 2. Filtriamo per Categoria
+        var result = allActivities.filter { $0.category == category }
+        
+        // 3. Applichiamo i Filtri
+        result = filters.apply(to: result)
+        
+        // 4. Filtriamo per Testo
+        if !searchText.isEmpty {
+            result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
         }
+        
+        return result
+    }
     
     var body: some View {
         ZStack {
@@ -95,7 +95,6 @@ struct ActivityCategoryView: View {
     }
 }
 
-// --- ROW DETTAGLIATA (Necessaria qui perché usata dalla lista) ---
 // --- ROW DETTAGLIATA (Necessaria qui perché usata dalla lista) ---
 struct DetailedActivityRow: View {
     let activity: Activity

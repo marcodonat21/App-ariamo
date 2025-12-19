@@ -209,6 +209,7 @@ class ActivityManager: ObservableObject {
     @Published var selectedActivityFromNotification: Activity? = nil
     
     @Published var shouldShowSuccessAfterLogin: Bool = false
+    @Published var shouldShowFavoriteSuccessAfterLogin: Bool = false
     
     private var isSaving = false
     private var imageCache: [String: Data] = [:]

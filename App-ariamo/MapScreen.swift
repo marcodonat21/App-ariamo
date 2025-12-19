@@ -15,6 +15,14 @@ struct MapLocation: Identifiable, Equatable {
     }
 }
 
+// --- STRUTTURA PER I CLUSTER ---
+struct ClusterAnnotation: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let count: Int
+    let locations: [MapLocation]
+}
+
 // 2. SCHERMATA MAPPA PRINCIPALE
 struct MapScreen: View {
     @Binding var searchText: String
@@ -85,6 +93,107 @@ struct MapScreen: View {
         return locations
     }
     
+    // --- LOGICA DI CLUSTERING MENO AGGRESSIVO ---
+    var clusteredAnnotations: [ClusterAnnotation] {
+        // Calcolo distanza in base allo zoom
+        let zoomLevel = locationManager.region.span.latitudeDelta
+        
+        // Se lo zoom è stretto (< 0.05), non fare clustering
+        // *** MODIFICATO: era 0.01, ora 0.05 per clustering più lasco ***
+        if zoomLevel < 0.05 {
+            return []
+        }
+        
+        // Distanza di raggruppamento in base allo zoom (più zoom = meno clustering)
+        // *** MODIFICATO: era 0.3, ora 0.5 per cluster più grandi e meno frequenti ***
+        let clusterDistance = max(zoomLevel * 0.5, 0.01)
+        
+        var clusters: [ClusterAnnotation] = []
+        var processedLocations: Set<UUID> = []
+        
+        for location in filteredLocations {
+            if processedLocations.contains(location.id) { continue }
+            
+            // Trova tutte le location vicine
+            var nearbyLocations = [location]
+            processedLocations.insert(location.id)
+            
+            for otherLocation in filteredLocations {
+                if processedLocations.contains(otherLocation.id) { continue }
+                
+                let distance = sqrt(
+                    pow(location.coordinate.latitude - otherLocation.coordinate.latitude, 2) +
+                    pow(location.coordinate.longitude - otherLocation.coordinate.longitude, 2)
+                )
+                
+                if distance < clusterDistance {
+                    nearbyLocations.append(otherLocation)
+                    processedLocations.insert(otherLocation.id)
+                }
+            }
+            
+            // Crea cluster solo se ci sono 2+ location
+            if nearbyLocations.count >= 2 {
+                let avgLat = nearbyLocations.map { $0.coordinate.latitude }.reduce(0, +) / Double(nearbyLocations.count)
+                let avgLon = nearbyLocations.map { $0.coordinate.longitude }.reduce(0, +) / Double(nearbyLocations.count)
+                
+                clusters.append(ClusterAnnotation(
+                    coordinate: CLLocationCoordinate2D(latitude: avgLat, longitude: avgLon),
+                    count: nearbyLocations.count,
+                    locations: nearbyLocations
+                ))
+            }
+        }
+        
+        return clusters
+    }
+    
+    // Location non raggruppate (singole)
+    var individualLocations: [MapLocation] {
+        let zoomLevel = locationManager.region.span.latitudeDelta
+        
+        // Se lo zoom è stretto, mostra tutte le location individuali
+        // *** MODIFICATO: era 0.01, ora 0.05 ***
+        if zoomLevel < 0.05 {
+            return filteredLocations
+        }
+        
+        // *** MODIFICATO: era 0.3, ora 0.5 ***
+        let clusterDistance = max(zoomLevel * 0.5, 0.01)
+        
+        var processed: Set<UUID> = []
+        var individuals: [MapLocation] = []
+        
+        for location in filteredLocations {
+            if processed.contains(location.id) { continue }
+            
+            var hasNearby = false
+            for otherLocation in filteredLocations {
+                if location.id == otherLocation.id { continue }
+                if processed.contains(otherLocation.id) { continue }
+                
+                let distance = sqrt(
+                    pow(location.coordinate.latitude - otherLocation.coordinate.latitude, 2) +
+                    pow(location.coordinate.longitude - otherLocation.coordinate.longitude, 2)
+                )
+                
+                if distance < clusterDistance {
+                    hasNearby = true
+                    processed.insert(location.id)
+                    processed.insert(otherLocation.id)
+                    break
+                }
+            }
+            
+            if !hasNearby {
+                individuals.append(location)
+                processed.insert(location.id)
+            }
+        }
+        
+        return individuals
+    }
+    
     var liveSelectedLocation: MapLocation? {
         guard let current = selectedLocation else { return nil }
         let found = manager.allActivities.first(where: { $0.id == current.id })
@@ -96,7 +205,7 @@ struct MapScreen: View {
     }
     
     var annotationItems: [MapLocation] {
-        var items = filteredLocations
+        var items = individualLocations
         if let userLoc = locationManager.userLocation {
             items.append(MapLocation(id: UUID(), name: "ME", coordinate: userLoc.coordinate, imageName: "person.fill", description: "", imageData: nil))
         }
@@ -112,6 +221,27 @@ struct MapScreen: View {
                     annotationView(for: location)
                 }
             }
+            .overlay(
+                // OVERLAY PER I CLUSTER
+                ForEach(clusteredAnnotations) { cluster in
+                    GeometryReader { geometry in
+                        let screenPoint = coordinateToScreen(cluster.coordinate, in: geometry)
+                        
+                        ClusterPinView(cluster: cluster, onTap: {
+                            // Zoom sulla prima location del cluster
+                            if let firstLocation = cluster.locations.first {
+                                withAnimation {
+                                    locationManager.region = MKCoordinateRegion(
+                                        center: cluster.coordinate,
+                                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                                    )
+                                }
+                            }
+                        })
+                        .position(x: screenPoint.x, y: screenPoint.y)
+                    }
+                }
+            )
             .ignoresSafeArea(.all)
             .onTapGesture {
                 hideKeyboard()
@@ -194,26 +324,27 @@ struct MapScreen: View {
                             }
                         }
                     }.padding(.bottom, 90)
-                    .padding(.trailing, 20)
-                                    }
+                    .padding(.trailing, 25)
+                }
             }
             
-            // CARD DETTAGLIO (Appare al click sul Pin)
-            if let liveLoc = liveSelectedLocation {
-                MapLocationCard(location: liveLoc) {
-                    // Navigazione al dettaglio
-                    navigateToDetail = true
-                } onClose: {
-                    withAnimation { selectedLocation = nil }
-                }
-                .zIndex(2)
+            // --- CARD DETTAGLIO (se pin selezionato) ---
+            if let location = selectedLocation {
+                MapLocationCard(
+                    location: location,
+                    onTap: { navigateToDetail = true },
+                    onClose: { withAnimation { selectedLocation = nil } }
+                )
             }
+            
+            // --- NAVIGATION LINK INVISIBILE ---
+            NavigationLink(
+                destination: destinationView,
+                isActive: $navigateToDetail,
+                label: { EmptyView() }
+            )
+            .hidden()
         }
-        .background(
-            // Link di navigazione nascosto
-            NavigationLink(destination: destinationView, isActive: $navigateToDetail) { EmptyView() }
-        )
-        .navigationBarHidden(true)
         .sheet(isPresented: $showFilters) {
             FilterSheetView(filters: filters, showSortOptions: false)
         }
@@ -238,6 +369,19 @@ struct MapScreen: View {
                 isLoggedIn: isLoggedIn
             )
         }
+    }
+    
+    // Funzione per convertire coordinate geografiche in posizione sullo schermo
+    func coordinateToScreen(_ coordinate: CLLocationCoordinate2D, in geometry: GeometryProxy) -> CGPoint {
+        let region = locationManager.region
+        
+        let x = (coordinate.longitude - (region.center.longitude - region.span.longitudeDelta / 2)) /
+                region.span.longitudeDelta * geometry.size.width
+        
+        let y = ((region.center.latitude + region.span.latitudeDelta / 2) - coordinate.latitude) /
+                region.span.latitudeDelta * geometry.size.height
+        
+        return CGPoint(x: x, y: y)
     }
     
     var destinationView: some View {
@@ -278,6 +422,29 @@ struct UserLocationPin: View {
     }
 }
 
+// --- VIEW PER I CLUSTER ---
+struct ClusterPinView: View {
+    let cluster: ClusterAnnotation
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            ZStack {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 50, height: 50)
+                    .shadow(radius: 4)
+                    .overlay(Circle().stroke(Color.white, lineWidth: 3))
+                
+                Text("\(cluster.count)")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
 // 4. PIN ATTIVITÀ
 struct MapPinView: View {
     let location: MapLocation
@@ -290,11 +457,13 @@ struct MapPinView: View {
         Button(action: onTap) {
             ZStack {
                 // Cerchio blu sfocato per guest (stile Airbnb)
+                // *** FIX: Aggiungiamo .allowsHitTesting(false) per evitare che catturi i tap ***
                 if !isLoggedIn {
                     Circle()
                         .fill(Color.blue.opacity(0.15))
                         .frame(width: 200, height: 200)
                         .blur(radius: 8)
+                        .allowsHitTesting(false) // <--- FIX IMPORTANTE
                 }
                 
                 VStack(spacing: 4) {
@@ -333,6 +502,7 @@ struct MapPinView: View {
                 .animation(.spring(), value: selectedLocation?.id)
             }
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
